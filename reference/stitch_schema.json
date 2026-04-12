@@ -1,0 +1,20 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Stitch Token Schema",
+  "type": "object",
+  "properties": {
+    "tokens": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "type": { "enum": ["color", "typography", "spacing", "radius"] },
+          "value": { "type": "string" },
+          "metadata": { "type": "object" }
+        },
+        "required": ["id", "type", "value"]
+      }
+    }
+  }
+}

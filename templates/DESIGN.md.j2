@@ -1,0 +1,20 @@
+# Design DNA: {{ project_name }}
+
+## Color Palette
+{% for color in colors %}
+- **{{ color.name }}**: `{{ color.hex }}` ({{ color.usage }})
+{% endfor %}
+
+## Typography
+{% for font in typography %}
+- **{{ font.role }}**: {{ font.family }}, {{ font.size }}, {{ font.weight }}
+{% endfor %}
+
+## Component Library Mapping
+{% for component in components %}
+- **Stitch ID**: `{{ component.stitch_id }}` -> **React Component**: `{{ component.name }}`
+{% endfor %}
+
+## Layout Tokens
+- **Container Max-Width**: {{ layout.max_width }}
+- **Grid Gutter**: {{ layout.gutter }}

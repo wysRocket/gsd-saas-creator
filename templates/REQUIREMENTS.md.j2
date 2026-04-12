@@ -1,0 +1,22 @@
+# Requirements: {{ project_name }}
+
+## Product Vision
+{{ product_vision }}
+
+## User Stories
+{% for story in user_stories %}
+- **As a** {{ story.role }}, **I want to** {{ story.action }}, **so that** {{ story.benefit }}.
+{% endfor %}
+
+## Technical Stack
+- **Frontend**: {{ frontend_stack }}
+- **Backend**: {{ backend_stack }}
+- **Database**: {{ database_stack }}
+
+## Key Features
+{% for feature in features %}
+- {{ feature }}
+{% endfor %}
+
+## Success Metrics
+- {{ success_metrics }}
