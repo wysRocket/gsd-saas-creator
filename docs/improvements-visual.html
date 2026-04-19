@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SaaS-Pretty-Projects — Improvements Overview</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #0d1117;
+    color: #e6edf3;
+    padding: 40px 32px;
+    line-height: 1.5;
+  }
+  h1 { font-size: 22px; font-weight: 700; margin-bottom: 6px; color: #f0f6fc; }
+  .subtitle { color: #8b949e; font-size: 14px; margin-bottom: 48px; }
+
+  .section { margin-bottom: 56px; }
+  .section-label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #8b949e;
+    margin-bottom: 16px;
+  }
+  .section-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: #f0f6fc;
+    margin-bottom: 20px;
+  }
+
+  /* Pipeline */
+  .pipeline {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+  .pipeline-row {
+    display: flex;
+    align-items: center;
+    gap: 0;
+  }
+  .pipeline-label {
+    font-size: 12px;
+    color: #8b949e;
+    width: 80px;
+    flex-shrink: 0;
+  }
+  .stages {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0;
+  }
+  .stage {
+    display: flex;
+    align-items: center;
+    gap: 0;
+  }
+  .stage-box {
+    padding: 7px 14px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+  .stage-arrow {
+    color: #30363d;
+    font-size: 16px;
+    padding: 0 4px;
+  }
+  .s-current { background: #21262d; border: 1px solid #30363d; color: #8b949e; }
+  .s-board   { background: #1f2937; border: 1px solid #374151; color: #9ca3af; }
+  .s-design  { background: #0d2137; border: 1px solid #1d4ed8; color: #60a5fa; }
+  .s-stitch  { background: #1a1033; border: 1px solid #7c3aed; color: #a78bfa; }
+  .s-ai      { background: #0f2418; border: 1px solid #15803d; color: #4ade80; }
+  .s-code    { background: #1a1a0d; border: 1px solid #a16207; color: #facc15; }
+  .s-live    { background: #1a0f0f; border: 1px solid #dc2626; color: #f87171; }
+  .s-ops     { background: #0f1a1a; border: 1px solid #0891b2; color: #67e8f9; }
+  .s-new     { background: #1e2d1e; border: 1px solid #22c55e; color: #86efac; }
+  .new-badge {
+    font-size: 9px;
+    background: #15803d;
+    color: #fff;
+    border-radius: 3px;
+    padding: 1px 4px;
+    margin-left: 5px;
+    letter-spacing: 0.05em;
+    font-weight: 700;
+  }
+
+  /* Brief template */
+  .brief-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  .brief-card {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 10px;
+    padding: 16px 18px;
+  }
+  .brief-card.has { border-color: #238636; }
+  .brief-card.missing { border-color: #f85149; }
+  .brief-card.needed { border-color: #d29922; }
+  .brief-card-label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+  .has .brief-card-label { color: #3fb950; }
+  .missing .brief-card-label { color: #f85149; }
+  .needed .brief-card-label { color: #d29922; }
+  .brief-field {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin-bottom: 7px;
+    font-size: 13px;
+  }
+  .dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    margin-top: 5px;
+  }
+  .has .dot { background: #3fb950; }
+  .missing .dot { background: #f85149; }
+  .needed .dot { background: #d29922; }
+  .field-name { color: #e6edf3; font-weight: 500; }
+  .field-desc { color: #8b949e; font-size: 12px; }
+
+  /* Workflow */
+  .workflow {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+  .wf-step {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    position: relative;
+  }
+  .wf-step:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    left: 17px;
+    top: 36px;
+    bottom: -20px;
+    width: 2px;
+    background: #30363d;
+  }
+  .wf-num {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 700;
+    flex-shrink: 0;
+    position: relative;
+    z-index: 1;
+  }
+  .wf-body {
+    padding-bottom: 32px;
+    flex: 1;
+  }
+  .wf-title { font-size: 14px; font-weight: 600; color: #f0f6fc; margin-bottom: 4px; }
+  .wf-desc { font-size: 12px; color: #8b949e; margin-bottom: 8px; }
+  .wf-improvement {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-left: 3px solid #d29922;
+    border-radius: 0 6px 6px 0;
+    padding: 8px 12px;
+    font-size: 12px;
+    color: #d29922;
+  }
+  .wf-improvement strong { color: #f0f6fc; font-weight: 600; }
+
+  .n1 { background: #1d2d3e; color: #58a6ff; }
+  .n2 { background: #1e2d1e; color: #3fb950; }
+  .n3 { background: #1a1033; color: #a78bfa; }
+  .n4 { background: #0f1a1a; color: #67e8f9; }
+  .n5 { background: #1a1a0d; color: #facc15; }
+  .n6 { background: #1a0f0f; color: #f87171; }
+  .n7 { background: #0d1f2d; color: #38bdf8; }
+
+  /* Board fields */
+  .fields-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 12px;
+  }
+  .field-card {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    padding: 14px 16px;
+  }
+  .field-card.exists { border-color: #238636; }
+  .field-card.add    { border-color: #d29922; }
+  .fc-tag {
+    display: inline-block;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    padding: 2px 6px;
+    border-radius: 3px;
+    margin-bottom: 8px;
+  }
+  .exists .fc-tag { background: #238636; color: #fff; }
+  .add .fc-tag    { background: #9e6a03; color: #fff; }
+  .fc-name { font-size: 13px; font-weight: 600; color: #f0f6fc; margin-bottom: 4px; }
+  .fc-desc { font-size: 11px; color: #8b949e; }
+
+  .divider {
+    border: none;
+    border-top: 1px solid #21262d;
+    margin: 48px 0;
+  }
+</style>
+</head>
+<body>
+
+<h1>SaaS-Pretty-Projects — Improvements Overview</h1>
+<p class="subtitle">23 real SaaS products · Sequential launches · Active: 02-04 Game Analogue</p>
+
+<!-- SECTION A: PROJECT BOARD -->
+<div class="section">
+  <div class="section-label">Dimension A · Project Board</div>
+  <div class="section-title">Pipeline Stages</div>
+  <div class="pipeline">
+    <div class="pipeline-row">
+      <div class="pipeline-label" style="color:#f85149;">Current</div>
+      <div class="stages">
+        <div class="stage">
+          <div class="stage-box s-current">Brief</div>
+        </div>
+        <div class="stage">
+          <div class="stage-arrow">→</div>
+          <div class="stage-box s-current" style="color:#6e7681;">···</div>
+        </div>
+      </div>
+    </div>
+    <div class="pipeline-row">
+      <div class="pipeline-label" style="color:#3fb950;">Improved</div>
+      <div class="stages">
+        <div class="stage">
+          <div class="stage-box s-board">Brief</div>
+          <div class="stage-arrow">→</div>
+        </div>
+        <div class="stage">
+          <div class="stage-box s-design">Design.md<span class="new-badge">NEW</span></div>
+          <div class="stage-arrow">→</div>
+        </div>
+        <div class="stage">
+          <div class="stage-box s-stitch">STITCH Prompt<span class="new-badge">NEW</span></div>
+          <div class="stage-arrow">→</div>
+        </div>
+        <div class="stage">
+          <div class="stage-box s-ai">Designs Ready<span class="new-badge">NEW</span></div>
+          <div class="stage-arrow">→</div>
+        </div>
+        <div class="stage">
+          <div class="stage-box s-code">AI Studio<span class="new-badge">NEW</span></div>
+          <div class="stage-arrow">→</div>
+        </div>
+        <div class="stage">
+          <div class="stage-box s-live">Launched<span class="new-badge">NEW</span></div>
+          <div class="stage-arrow">→</div>
+        </div>
+        <div class="stage">
+          <div class="stage-box s-ops">Operating<span class="new-badge">NEW</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="height:32px;"></div>
+  <div class="section-title">Board Fields to Add</div>
+  <div class="fields-grid">
+    <div class="field-card exists">
+      <div class="fc-tag">Exists</div>
+      <div class="fc-name">Title</div>
+      <div class="fc-desc">Project name + ID prefix (e.g. 02-04)</div>
+    </div>
+    <div class="field-card exists">
+      <div class="fc-tag">Exists</div>
+      <div class="fc-name">Stage</div>
+      <div class="fc-desc">Currently only "Brief" — expand to full pipeline</div>
+    </div>
+    <div class="field-card exists">
+      <div class="fc-tag">Exists</div>
+      <div class="fc-name">Assignee</div>
+      <div class="fc-desc">Already on 02-04, apply to others when active</div>
+    </div>
+    <div class="field-card add">
+      <div class="fc-tag">Add</div>
+      <div class="fc-name">Priority</div>
+      <div class="fc-desc">Launch order 1–23 or tiers (P1/P2/P3)</div>
+    </div>
+    <div class="field-card add">
+      <div class="fc-tag">Add</div>
+      <div class="fc-name">Repository</div>
+      <div class="fc-desc">Link GitHub repo when created for the project</div>
+    </div>
+    <div class="field-card add">
+      <div class="fc-tag">Add</div>
+      <div class="fc-name">Target Launch Date</div>
+      <div class="fc-desc">Rough milestone — keeps sequencing visible</div>
+    </div>
+    <div class="field-card add">
+      <div class="fc-tag">Add</div>
+      <div class="fc-name">Vertical</div>
+      <div class="fc-desc">Hosting / Gaming / Digital Goods / Education / Career</div>
+    </div>
+    <div class="field-card add">
+      <div class="fc-tag">Add</div>
+      <div class="fc-name">Revenue Model</div>
+      <div class="fc-desc">Subscription / One-time / Marketplace / Freemium</div>
+    </div>
+    <div class="field-card add">
+      <div class="fc-tag">Add</div>
+      <div class="fc-name">Tech Complexity</div>
+      <div class="fc-desc">S / M / L — helps sequence similar-complexity projects together</div>
+    </div>
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- SECTION B: BRIEF CONTENT -->
+<div class="section">
+  <div class="section-label">Dimension B · Brief Content</div>
+  <div class="section-title">What Each Brief Needs</div>
+  <div class="brief-grid">
+    <div class="brief-card has">
+      <div class="brief-card-label">Already Present</div>
+      <div class="brief-field"><div class="dot"></div><div><span class="field-name">Business narrative</span> <span class="field-desc">— detailed Russian-language description</span></div></div>
+      <div class="brief-field"><div class="dot"></div><div><span class="field-name">Value proposition</span> <span class="field-desc">— what problem it solves</span></div></div>
+      <div class="brief-field"><div class="dot"></div><div><span class="field-name">Broad target audience</span> <span class="field-desc">— who the customer is</span></div></div>
+      <div class="brief-field"><div class="dot"></div><div><span class="field-name">Revenue logic</span> <span class="field-desc">— how money is made</span></div></div>
+      <div class="brief-field"><div class="dot"></div><div><span class="field-name">Legal/compliance notes</span> <span class="field-desc">— risk areas flagged</span></div></div>
+    </div>
+    <div class="brief-card missing">
+      <div class="brief-card-label">Missing — Critical for Pipeline</div>
+      <div class="brief-field"><div class="dot"></div><div><span class="field-name">MVP Feature List</span> <span class="field-desc">— v1 scope, what's in/out</span></div></div>
+      <div class="brief-field"><div class="dot"></div><div><span class="field-name">Key Pages / Screens</span> <span class="field-desc">— what STITCH needs to generate</span></div></div>
+      <div class="brief-field"><div class="dot"></div><div><span class="field-name">Design Direction</span> <span class="field-desc">— tone, style, mood, premium vs minimal</span></div></div>
+      <div class="brief-field"><div class="dot"></div><div><span class="field-name">Specific Persona</span> <span class="field-desc">— 1-2 named users with real pain points</span></div></div>
+      <div class="brief-field"><div class="dot"></div><div><span class="field-name">Pricing Tiers</span> <span class="field-desc">— specific plan names and prices</span></div></div>
+    </div>
+    <div class="brief-card needed">
+      <div class="brief-card-label">Needed — For AI Studio Code Gen</div>
+      <div class="brief-field"><div class="dot"></div><div><span class="field-name">Tech Stack Hints</span> <span class="field-desc">— auth method, DB type, deployment target</span></div></div>
+      <div class="brief-field"><div class="dot"></div><div><span class="field-name">Competitor References</span> <span class="field-desc">— visual/UX benchmarks for STITCH prompts</span></div></div>
+      <div class="brief-field"><div class="dot"></div><div><span class="field-name">Brand Name + Domain</span> <span class="field-desc">— like "Hostevra" in 01-01</span></div></div>
+      <div class="brief-field"><div class="dot"></div><div><span class="field-name">Success Metric for Launch</span> <span class="field-desc">— what "launched" means (first paying user?)</span></div></div>
+    </div>
+    <div class="brief-card" style="border-color:#58a6ff;">
+      <div class="brief-card-label" style="color:#58a6ff;">Structural</div>
+      <div class="brief-field"><div class="dot" style="background:#58a6ff;"></div><div><span class="field-name">Language</span> <span class="field-desc">— briefs are Russian, pipeline is English. Add English summary section to each brief for STITCH prompt generation.</span></div></div>
+      <div class="brief-field" style="margin-top:8px;"><div class="dot" style="background:#58a6ff;"></div><div><span class="field-name">Standardize Format</span> <span class="field-desc">— prose → structured sections so design.md can be generated consistently from any brief.</span></div></div>
+    </div>
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- SECTION C: WORKFLOW -->
+<div class="section">
+  <div class="section-label">Dimension C · Workflow</div>
+  <div class="section-title">Improved Brief → Launch Pipeline</div>
+  <div class="workflow">
+    <div class="wf-step">
+      <div class="wf-num n1">1</div>
+      <div class="wf-body">
+        <div class="wf-title">Brief (GitHub Project Item)</div>
+        <div class="wf-desc">Business narrative + all structured fields filled in.</div>
+        <div class="wf-improvement"><strong>Add:</strong> English summary section, MVP scope, key screens list, design direction, brand name, competitor URLs</div>
+      </div>
+    </div>
+    <div class="wf-step">
+      <div class="wf-num" style="background:#1a1a2e;color:#818cf8;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;position:relative;z-index:1;">DL</div>
+      <div class="wf-body">
+        <div class="wf-title">designlang Extraction <span style="background:#312e81;color:#a5b4fc;font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;margin-left:6px;letter-spacing:0.04em;">NEW STEP</span></div>
+        <div class="wf-desc">Run <code style="background:#161b22;padding:2px 6px;border-radius:3px;font-size:11px;">npx designlang &lt;competitor-url&gt; --full --screenshots</code> on reference sites from the brief.</div>
+        <div class="wf-improvement"><strong>Output:</strong> 8 files — design-language.md, Tailwind config, Figma variables, component screenshots, WCAG score. Feeds directly into design.md and STITCH prompt. <br><br><strong>For 02-04:</strong> run on <code style="background:#161b22;padding:1px 5px;border-radius:3px;">kingdomofarcane.com</code> — it's already the reference in the brief title.</div>
+      </div>
+    </div>
+    <div class="wf-step">
+      <div class="wf-num n2">2</div>
+      <div class="wf-body">
+        <div class="wf-title">design.md Generation</div>
+        <div class="wf-desc">Structured design spec derived from brief + designlang output. Real tokens (colors, fonts, spacing) replace guesswork.</div>
+        <div class="wf-improvement"><strong>Add:</strong> Paste extracted <code style="background:#161b22;padding:1px 5px;border-radius:3px;">*-design-language.md</code> as an appendix so every design.md has verified competitor tokens</div>
+      </div>
+    </div>
+    <div class="wf-step">
+      <div class="wf-num n3">3</div>
+      <div class="wf-body">
+        <div class="wf-title">STITCH Prompt Crafting</div>
+        <div class="wf-desc">Translate design.md into STITCH-optimized prompts using the Google AI guide format — now backed by real extracted tokens.</div>
+        <div class="wf-improvement"><strong>Add:</strong> Store as <code style="background:#161b22;padding:1px 5px;border-radius:3px;">stitch-prompt.md</code> in repo. Reference extracted screenshots as visual anchors in the prompt.</div>
+      </div>
+    </div>
+    <div class="wf-step">
+      <div class="wf-num n4">4</div>
+      <div class="wf-body">
+        <div class="wf-title">STITCH Design Generation</div>
+        <div class="wf-desc">STITCH generates UI mockups / style system using luxuryuilib.</div>
+        <div class="wf-improvement"><strong>Add:</strong> Export artifacts (images/specs) to <code>/designs</code> folder in repo before moving to AI Studio</div>
+      </div>
+    </div>
+    <div class="wf-step">
+      <div class="wf-num n5">5</div>
+      <div class="wf-body">
+        <div class="wf-title">AI Studio Code Generation</div>
+        <div class="wf-desc">Pass design artifacts + design.md to aistudio.google.com, generate full codebase.</div>
+        <div class="wf-improvement"><strong>Add:</strong> Standard "AI Studio handoff doc" — one file that packages brief + design + tech hints into a single prompt bundle</div>
+      </div>
+    </div>
+    <div class="wf-step">
+      <div class="wf-num n6">6</div>
+      <div class="wf-body">
+        <div class="wf-title">GitHub Publish + Launch</div>
+        <div class="wf-desc">Code committed, deployed, domain live.</div>
+        <div class="wf-improvement"><strong>Add:</strong> Launch checklist (README, LICENSE, ENV vars documented, payment connected, analytics) before marking "Launched"</div>
+      </div>
+    </div>
+    <div class="wf-step">
+      <div class="wf-num n7">7</div>
+      <div class="wf-body">
+        <div class="wf-title">Operating Stage</div>
+        <div class="wf-desc">Product is live. Feedback loop starts, next brief gets activated.</div>
+        <div class="wf-improvement"><strong>Add:</strong> "Learnings" note on the GitHub project item — 3 things that went well, 3 to fix before the next project</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
