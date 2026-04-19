@@ -5,3 +5,7 @@ __pycache__/
 .agents/
 .gsd/
 node_modules/
+designs/.claude/
+designs/.cursor/
+designs/CLAUDE.md.fragment
+designs/agents.md
