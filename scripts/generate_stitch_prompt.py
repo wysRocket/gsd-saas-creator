@@ -5,13 +5,7 @@ Reads brief.md + competitor design-language.md, then calls Gemini
 to produce a production-ready stitch-prompt.md optimised for AI Studio.
 
 Usage:
-    python scripts/generate_stitch_prompt.py \\
-        --repo-dir ./output/terrastone
-
-    # Or supply individual paths:
-    python scripts/generate_stitch_prompt.py \\
-        --brief ./output/terrastone/brief.md \\
-        --design-language ./output/terrastone/design/competitor-design-language.md
+    python scripts/generate_stitch_prompt.py --repo-dir ./output/terrastone
 
 Environment variables:
     GEMINI_API_KEY     — Google AI Studio key (required)
@@ -26,8 +20,8 @@ import sys
 import textwrap
 from pathlib import Path
 
-import google.generativeai as genai  # pip install google-generativeai
-
+from google import genai                      # pip install google-genai
+from google.genai import types as genai_types
 
 # ---------------------------------------------------------------------------
 # Config
@@ -36,7 +30,6 @@ import google.generativeai as genai  # pip install google-generativeai
 TEMPLATES_DIR = Path(__file__).parent.parent / "templates"
 STITCH_TEMPLATE = TEMPLATES_DIR / "stitch-template.md"
 GEMINI_MODEL = "gemini-2.0-flash"
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -59,10 +52,8 @@ def _load(path: Path, label: str) -> str:
 def _load_stitch_template() -> str:
     if STITCH_TEMPLATE.exists():
         return STITCH_TEMPLATE.read_text()
-    # Minimal embedded fallback
     return textwrap.dedent("""\
         # STITCH PROMPT — {{PROJECT_NAME}}
-
         ## System Prompt (Global)
         ## Page: Landing
         ### Hero Section
@@ -74,9 +65,8 @@ def _load_stitch_template() -> str:
         ### Main Content Area
     """)
 
-
 # ---------------------------------------------------------------------------
-# Gemini call
+# Gemini call (google-genai SDK)
 # ---------------------------------------------------------------------------
 
 SYSTEM_PROMPT = textwrap.dedent("""\
@@ -101,8 +91,7 @@ def generate_stitch_prompt(
     design_language_md: str,
     template: str,
 ) -> str:
-    genai.configure(api_key=_require_env("GEMINI_API_KEY"))
-    model = genai.GenerativeModel(GEMINI_MODEL)
+    client = genai.Client(api_key=_require_env("GEMINI_API_KEY"))
 
     user_prompt = (
         "=== Product Brief ===\n"
@@ -114,13 +103,16 @@ def generate_stitch_prompt(
         "Produce the complete stitch-prompt.md now. Be exhaustive."
     )
 
-    response = model.generate_content(
-        [{"role": "user", "parts": [user_prompt]}],
-        generation_config={"temperature": 0.3, "max_output_tokens": 4096},
-        system_instruction=SYSTEM_PROMPT,
+    response = client.models.generate_content(
+        model=GEMINI_MODEL,
+        contents=user_prompt,
+        config=genai_types.GenerateContentConfig(
+            system_instruction=SYSTEM_PROMPT,
+            temperature=0.3,
+            max_output_tokens=4096,
+        ),
     )
     return response.text
-
 
 # ---------------------------------------------------------------------------
 # Main
@@ -128,18 +120,17 @@ def generate_stitch_prompt(
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Generate stitch-prompt.md via Gemini")
-    parser.add_argument("--repo-dir", default="./output", help="Target repo directory (auto-discovers brief.md and design/)")
+    parser.add_argument("--repo-dir", default="./output", help="Target repo directory")
     parser.add_argument("--brief", help="Explicit path to brief.md")
     parser.add_argument("--design-language", help="Explicit path to design-language.md")
     args = parser.parse_args()
 
     repo_dir = Path(args.repo_dir)
-
-    # Resolve input paths
     brief_path = Path(args.brief) if args.brief else repo_dir / "brief.md"
+    dl_candidates = list(repo_dir.glob("design/*design-language.md"))
     dl_path = (
         Path(args.design_language) if args.design_language
-        else next(repo_dir.glob("design/*design-language.md"), repo_dir / "design" / "competitor-design-language.md")
+        else (dl_candidates[-1] if dl_candidates else repo_dir / "design" / "competitor-design-language.md")
     )
 
     brief_md = _load(brief_path, "brief.md")

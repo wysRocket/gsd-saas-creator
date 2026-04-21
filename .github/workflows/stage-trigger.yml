@@ -50,7 +50,7 @@ jobs:
           node-version: "20"
 
       - name: Install Python deps
-        run: pip install google-generativeai requests
+        run: pip install --quiet google-genai requests
 
       - name: Extract context from payload
         id: ctx
@@ -65,12 +65,13 @@ jobs:
         if: env.COMPETITOR_URL != ''
         run: |
           mkdir -p output/${REPO_NAME}/design
-          npx designlang ${COMPETITOR_URL} --full --screenshots --output output/${REPO_NAME}/design || true
+          npx designlang ${COMPETITOR_URL} --full --screenshots --out output/${REPO_NAME}/design || true
 
       - name: Generate brief.md
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
+          pip install --quiet google-genai
           python scripts/generate_brief.py \
             --name "${PROJECT_NAME}" \
             --competitor-url "${COMPETITOR_URL}" \
@@ -81,6 +82,7 @@ jobs:
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
+          pip install --quiet google-genai
           python scripts/generate_stitch_prompt.py \
             --repo-dir output/${REPO_NAME}
 
