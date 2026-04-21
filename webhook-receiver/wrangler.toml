@@ -1,0 +1,13 @@
+name = "saas-pipeline-webhook"
+main = "src/index.ts"
+compatibility_date = "2024-11-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Secrets (set via: wrangler secret put GITHUB_WEBHOOK_SECRET)
+# GITHUB_WEBHOOK_SECRET  — shared secret from GitHub webhook config
+# GH_TOKEN               — PAT with repo+project scopes
+# REPO_OWNER             — "wysRocket" (where gsd-saas-creator lives)
+# REPO_NAME              — "gsd-saas-creator"
+
+[vars]
+ENVIRONMENT = "production"
