@@ -37,7 +37,7 @@ from google.genai import types as genai_types
 
 TEMPLATES_DIR = Path(__file__).parent.parent / "templates"
 BRIEF_TEMPLATE = TEMPLATES_DIR / "brief-template.md"
-GEMINI_MODEL = "gemini-2.0-flash-001"
+GEMINI_MODEL = "gemini-2.5-flash"
 
 # ---------------------------------------------------------------------------
 # Helpers
