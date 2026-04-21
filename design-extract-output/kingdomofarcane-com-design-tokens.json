@@ -1,0 +1,342 @@
+{
+  "$metadata": {
+    "generator": "designlang",
+    "version": "7.0.0",
+    "spec": "https://design-tokens.github.io/community-group/format/",
+    "source": "https://kingdomofarcane.com",
+    "generatedAt": "2026-04-19T10:56:36.284Z"
+  },
+  "primitive": {
+    "color": {
+      "brand": {
+        "primary": {
+          "$value": "#00d9ff",
+          "$type": "color"
+        },
+        "secondary": {
+          "$value": "#e8e8f0",
+          "$type": "color"
+        }
+      },
+      "neutral": {
+        "n100": {
+          "$value": "#000000",
+          "$type": "color"
+        },
+        "n200": {
+          "$value": "#ffffff",
+          "$type": "color"
+        }
+      },
+      "background": {
+        "bg0": {
+          "$value": "#0a0a0f",
+          "$type": "color"
+        },
+        "bg1": {
+          "$value": "#0d0d18",
+          "$type": "color"
+        },
+        "bg2": {
+          "$value": "#4a08d2",
+          "$type": "color"
+        },
+        "bg3": {
+          "$value": "#00b1ff",
+          "$type": "color"
+        },
+        "bg4": {
+          "$value": "#010103",
+          "$type": "color"
+        }
+      },
+      "text": {
+        "text0": {
+          "$value": "#000000",
+          "$type": "color"
+        },
+        "text1": {
+          "$value": "#e8e8f0",
+          "$type": "color"
+        },
+        "text2": {
+          "$value": "#00d9ff",
+          "$type": "color"
+        },
+        "text3": {
+          "$value": "#9ca3af",
+          "$type": "color"
+        },
+        "text4": {
+          "$value": "#c8c8d8",
+          "$type": "color"
+        },
+        "text5": {
+          "$value": "#00b1ff",
+          "$type": "color"
+        },
+        "text6": {
+          "$value": "#4b5563",
+          "$type": "color"
+        }
+      }
+    },
+    "spacing": {
+      "s0": {
+        "$value": "4px",
+        "$type": "dimension"
+      },
+      "s1": {
+        "$value": "112px",
+        "$type": "dimension"
+      }
+    },
+    "radius": {
+      "r0": {
+        "$value": "6px",
+        "$type": "dimension"
+      },
+      "r1": {
+        "$value": "12px",
+        "$type": "dimension"
+      },
+      "r2": {
+        "$value": "16px",
+        "$type": "dimension"
+      }
+    },
+    "shadow": {
+      "sh0": {
+        "$value": "rgba(255, 184, 0, 0.8) 0px 0px 0px 2px, rgba(0, 0, 0, 0.8) 0px 0px 0px 3px, rgba(255, 255, 255, 0.25) 0px 2px 4px 0px inset, rgba(0, 0, 0, 0.5) 0px -2px 4px 0px inset, rgba(0, 217, 255, 0.4) 0px 0px 20px 0px, rgba(0, 0, 0, 0.8) 0px 8px 16px 0px",
+        "$type": "shadow"
+      },
+      "sh1": {
+        "$value": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 217, 255, 0.15) 0px 0px 12px 0px",
+        "$type": "shadow"
+      },
+      "sh2": {
+        "$value": "rgba(139, 92, 46, 0.6) 0px 0px 0px 2px, rgba(0, 0, 0, 0.8) 0px 0px 0px 3px, rgba(255, 255, 255, 0.15) 0px 2px 4px 0px inset, rgba(0, 0, 0, 0.4) 0px -2px 4px 0px inset, rgba(0, 0, 0, 0.6) 0px 6px 12px 0px",
+        "$type": "shadow"
+      },
+      "sh3": {
+        "$value": "rgb(0, 180, 216) 0px 0px 4px 0px",
+        "$type": "shadow"
+      },
+      "sh4": {
+        "$value": "rgb(0, 217, 255) 0px 0px 4px 0px",
+        "$type": "shadow"
+      },
+      "sh5": {
+        "$value": "rgb(74, 144, 226) 0px 0px 4px 0px",
+        "$type": "shadow"
+      },
+      "sh6": {
+        "$value": "rgb(147, 51, 234) 0px 0px 4px 0px",
+        "$type": "shadow"
+      },
+      "sh7": {
+        "$value": "rgb(147, 51, 234) 0px 0px 4.3428px 0px",
+        "$type": "shadow"
+      },
+      "sh8": {
+        "$value": "rgb(0, 217, 255) 0px 0px 4.4109px 0px",
+        "$type": "shadow"
+      },
+      "sh9": {
+        "$value": "rgb(147, 51, 234) 0px 0px 4.4616px 0px",
+        "$type": "shadow"
+      },
+      "sh10": {
+        "$value": "rgb(0, 180, 216) 0px 0px 4.5549px 0px",
+        "$type": "shadow"
+      },
+      "sh11": {
+        "$value": "rgb(147, 51, 234) 0px 0px 4.6926px 0px",
+        "$type": "shadow"
+      },
+      "sh12": {
+        "$value": "rgb(0, 180, 216) 0px 0px 4.6968px 0px",
+        "$type": "shadow"
+      },
+      "sh13": {
+        "$value": "rgb(0, 217, 255) 0px 0px 4.7025px 0px",
+        "$type": "shadow"
+      },
+      "sh14": {
+        "$value": "rgb(74, 144, 226) 0px 0px 4.7088px 0px",
+        "$type": "shadow"
+      },
+      "sh15": {
+        "$value": "rgb(74, 144, 226) 0px 0px 5.0541px 0px",
+        "$type": "shadow"
+      },
+      "sh16": {
+        "$value": "rgb(147, 51, 234) 0px 0px 5.1021px 0px",
+        "$type": "shadow"
+      },
+      "sh17": {
+        "$value": "rgb(0, 180, 216) 0px 0px 5.2863px 0px",
+        "$type": "shadow"
+      },
+      "sh18": {
+        "$value": "rgb(147, 51, 234) 0px 0px 5.3634px 0px",
+        "$type": "shadow"
+      },
+      "sh19": {
+        "$value": "rgb(74, 144, 226) 0px 0px 5.3904px 0px",
+        "$type": "shadow"
+      },
+      "sh20": {
+        "$value": "rgb(0, 180, 216) 0px 0px 5.6583px 0px",
+        "$type": "shadow"
+      },
+      "sh21": {
+        "$value": "rgb(147, 51, 234) 0px 0px 5.6553px 0px",
+        "$type": "shadow"
+      },
+      "sh22": {
+        "$value": "rgb(0, 217, 255) 0px 0px 5.7015px 0px",
+        "$type": "shadow"
+      },
+      "sh23": {
+        "$value": "rgb(0, 217, 255) 0px 0px 5.808px 0px",
+        "$type": "shadow"
+      },
+      "sh24": {
+        "$value": "rgb(147, 51, 234) 0px 0px 5.8257px 0px",
+        "$type": "shadow"
+      },
+      "sh25": {
+        "$value": "rgb(74, 144, 226) 0px 0px 6.405px 0px",
+        "$type": "shadow"
+      },
+      "sh26": {
+        "$value": "rgb(74, 144, 226) 0px 0px 6.4074px 0px",
+        "$type": "shadow"
+      },
+      "sh27": {
+        "$value": "rgb(74, 144, 226) 0px 0px 6.5274px 0px",
+        "$type": "shadow"
+      },
+      "sh28": {
+        "$value": "rgb(0, 180, 216) 0px 0px 6.6078px 0px",
+        "$type": "shadow"
+      },
+      "sh29": {
+        "$value": "rgb(74, 144, 226) 0px 0px 6.6609px 0px",
+        "$type": "shadow"
+      },
+      "sh30": {
+        "$value": "rgb(0, 180, 216) 0px 0px 7.2351px 0px",
+        "$type": "shadow"
+      },
+      "sh31": {
+        "$value": "rgb(147, 51, 234) 0px 0px 7.4082px 0px",
+        "$type": "shadow"
+      },
+      "sh32": {
+        "$value": "rgb(0, 217, 255) 0px 0px 7.5705px 0px",
+        "$type": "shadow"
+      },
+      "sh33": {
+        "$value": "rgb(0, 217, 255) 0px 0px 7.8234px 0px",
+        "$type": "shadow"
+      },
+      "sh34": {
+        "$value": "rgb(0, 180, 216) 0px 0px 8.0178px 0px",
+        "$type": "shadow"
+      },
+      "sh35": {
+        "$value": "rgb(0, 217, 255) 0px 0px 8.1627px 0px",
+        "$type": "shadow"
+      },
+      "sh36": {
+        "$value": "rgb(0, 217, 255) 0px 0px 8.2005px 0px",
+        "$type": "shadow"
+      },
+      "sh37": {
+        "$value": "rgb(0, 180, 216) 0px 0px 8.421px 0px",
+        "$type": "shadow"
+      },
+      "sh38": {
+        "$value": "rgb(0, 180, 216) 0px 0px 8.5518px 0px",
+        "$type": "shadow"
+      },
+      "sh39": {
+        "$value": "rgb(147, 51, 234) 0px 0px 8.7015px 0px",
+        "$type": "shadow"
+      },
+      "sh40": {
+        "$value": "rgb(0, 217, 255) 0px 0px 8.874px 0px",
+        "$type": "shadow"
+      },
+      "sh41": {
+        "$value": "rgb(74, 144, 226) 0px 0px 8.9496px 0px",
+        "$type": "shadow"
+      }
+    },
+    "fontFamily": {
+      "f0": {
+        "$value": "Inter",
+        "$type": "fontFamily"
+      },
+      "f1": {
+        "$value": "ui-sans-serif",
+        "$type": "fontFamily"
+      },
+      "f2": {
+        "$value": "Cinzel",
+        "$type": "fontFamily"
+      }
+    }
+  },
+  "semantic": {
+    "color": {
+      "action": {
+        "primary": {
+          "$value": "{primitive.color.brand.primary}",
+          "$type": "color"
+        },
+        "secondary": {
+          "$value": "{primitive.color.brand.secondary}",
+          "$type": "color"
+        }
+      },
+      "surface": {
+        "default": {
+          "$value": "{primitive.color.background.bg0}",
+          "$type": "color"
+        }
+      },
+      "text": {
+        "body": {
+          "$value": "{primitive.color.text.text0}",
+          "$type": "color"
+        }
+      }
+    },
+    "typography": {
+      "body": {
+        "$value": {
+          "fontFamily": "Inter",
+          "fontSize": "28px",
+          "fontWeight": "600",
+          "lineHeight": "39.2px"
+        },
+        "$type": "typography"
+      }
+    },
+    "radius": {
+      "control": {
+        "$value": "{primitive.radius.r0}",
+        "$type": "dimension"
+      }
+    },
+    "shadow": {
+      "elevated": {
+        "$value": "{primitive.shadow.sh0}",
+        "$type": "shadow"
+      }
+    }
+  }
+}

@@ -1,0 +1,19 @@
+/* shadcn/ui Theme — extracted from https://kingdomofarcane.com */
+/* Paste into your globals.css */
+
+@layer base {
+  :root {
+    --background: 240 20% 5%;
+    --foreground: 0 0% 0%;
+    --primary: 189 100% 50%;
+    --primary-foreground: 0 0% 0%;
+    --secondary: 240 21% 93%;
+    --secondary-foreground: 0 0% 0%;
+    --accent: 198 100% 50%;
+    --accent-foreground: 0 0% 100%;
+    --muted: 0 0% 100%;
+    --muted-foreground: 0 0% 0%;
+    --border: 0 0% 100%;
+    --radius: 6px;
+  }
+}

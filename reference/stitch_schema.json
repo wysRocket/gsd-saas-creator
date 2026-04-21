@@ -1,20 +1,188 @@
 {
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "Stitch Token Schema",
-  "type": "object",
-  "properties": {
-    "tokens": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "properties": {
-          "id": { "type": "string" },
-          "type": { "enum": ["color", "typography", "spacing", "radius"] },
-          "value": { "type": "string" },
-          "metadata": { "type": "object" }
-        },
-        "required": ["id", "type", "value"]
-      }
+  "project": {
+    "id": "13262938093905647630",
+    "title": "Monzo Onboarding Figma Flow Kit",
+    "device_type": "MOBILE",
+    "visibility": "PRIVATE",
+    "origin": "STITCH"
+  },
+  "design_system": {
+    "name": "Terminal Ledger",
+    "documentation": "# Design System Document: The Financial Editorial\n\n## 1. Overview & Creative North Star\n**The Creative North Star: \"The Intelligent Ledger\"**\n\nThis design system rejects the \"SaaS-template\" look in favor of a high-end editorial experience. It merges the urgent, data-dense authority of a Bloomberg terminal with the refined, spacious serenity of a private wealth management boutique. We do not just display data; we curate it.\n\nTo move beyond the generic, this system utilizes **Intentional Asymmetry** and **Tonal Depth**. We prioritize information density where it matters (market figures) while providing aggressive whitespace for narrative elements. The goal is a \"Data-Confident\" interface that feels like a premium physical publication\u2014substantial, tactile, and indisputably accurate.\n\n---\n\n## 2. Colors & Surface Architecture\n\nThe palette is anchored in deep navies and muted slate blues, balanced by \"Warm White\" surfaces that prevent the interface from feeling cold or clinical.\n\n### The \"No-Line\" Rule\n**Explicit Instruction:** Designers are prohibited from using 1px solid borders for sectioning or layout containment. \nStructure is defined through **Background Color Shifts**. To separate a sidebar from a main feed, transition from `surface` (#f7f9fb) to `surface-container-low` (#f2f4f6). Boundaries should be felt, not seen.\n\n### Surface Hierarchy & Nesting\nTreat the UI as a series of physical layers\u2014stacked sheets of fine, heavy-stock paper.\n*   **Base Layer:** `surface` (#f7f9fb) for global backgrounds.\n*   **Sectional Layer:** `surface-container-low` (#f2f4f6) for large architectural blocks.\n*   **Active/Component Layer:** `surface-container-lowest` (#ffffff) for primary cards and interaction zones. This creates a \"lift\" through purity rather than shadows.\n\n### The \"Glass & Gradient\" Rule\nTo add \"soul\" to the data:\n*   **Signature Textures:** Use subtle linear gradients for primary CTAs (e.g., `primary` #000000 transitioning to `primary_container` #131b2e).\n*   **Glassmorphism:** For floating modals or navigation overlays, use `surface-container-lowest` at 80% opacity with a `24px` backdrop blur. This ensures the \"Editorial\" layers feel integrated.\n\n---\n\n## 3. Typography\n\nThe typography strategy leverages two distinct geometric sans-serifs to balance technical precision with readability.\n\n*   **Display & Headlines (Manrope):** Chosen for its geometric confidence. Large scales (`display-lg` at 3.5rem) should be used with tight tracking (-2%) to mimic high-end financial broadsheets.\n*   **Body & Titles (Public Sans):** A neutral, \"workhorse\" typeface. For figures and data tables, use `body-md` with **tabular lining figures** to ensure decimal points align vertically, enhancing the \"Data-Confident\" feel.\n*   **Labels (Manrope Bold):** Small-caps or all-caps usage of `label-sm` should be used for metadata to create a rhythmic contrast against fluid body text.\n\n---\n\n## 4. Elevation & Depth\n\nWe eschew the traditional \"Material\" shadow system in favor of **Tonal Layering**.\n\n*   **The Layering Principle:** Depth is achieved by \"stacking.\" A `surface-container-highest` (#e0e3e5) element should only exist atop a `surface-dim` (#d8dadc) background to provide logical contrast.\n*   **Ambient Shadows:** If an element must float (e.g., a context menu), use an extra-diffused shadow: `offset-y: 12px, blur: 32px, color: rgba(25, 28, 30, 0.06)`. The shadow color is derived from `on_surface` to keep it natural.\n*   **The \"Ghost Border\" Fallback:** If accessibility requires a stroke (e.g., in high-glare environments), use `outline-variant` (#c6c6cd) at **15% opacity**. Never use a 100% opaque border.\n\n---\n\n## 5. Components\n\n### Cards & Data Modules\n*   **Constraint:** Forbid divider lines within cards.\n*   **Execution:** Use `24px` of vertical whitespace to separate header from content. Use a `surface-container-high` (#e6e8ea) background for the footer area of a card to distinguish \"Actions\" from \"Information.\"\n*   **Radius:** Use `md` (0.375rem) for data cards to maintain a precise, \"sharp\" financial aesthetic. Use `xl` (0.75rem) only for large \"Hero\" promotional cards.\n\n### Buttons\n*   **Primary:** Solid `primary` (#000000) with `on_primary` (#ffffff) text. Use `DEFAULT` (0.25rem) corner radius for an authoritative, \"stable\" feel.\n*   **Secondary:** `surface-container-highest` (#e0e3e5) background. No border.\n*   **Tertiary:** Ghost style. Use `on_surface` text with a bold weight.\n\n### Data Inputs\n*   **Field Style:** Use \"Enclosed\" fields with `surface-container-low` (#f2f4f6) fills. Avoid the \"Underline-only\" style as it feels too fleeting for a banking app.\n*   **Positive State:** Use `on_tertiary_container` (#009668) for successful \"Trade Executed\" or \"Funds Sent\" states. This \"Precise Green\" is the only high-saturation color allowed.\n\n### Contextual Components for Finance\n*   **The Ticker Tape:** A high-density horizontal scroll component using `label-sm` for stock symbols and `body-sm` for values.\n*   **The Perspective Grid:** A layout pattern where the left-hand 33% of the screen is a static \"Status\" area (`surface-container-lowest`) and the right-hand 66% is a scrolling \"Action/Detail\" area (`surface`).\n\n---\n\n## 6. Do's and Don'ts\n\n### Do\n*   **Do** use extreme typographic scale. A `3.5rem` balance figure next to a `0.75rem` label creates \"Editorial Punch.\"\n*   **Do** use `tertiary_fixed_dim` (#4edea3) for trend lines and positive delta indicators; it glows subtly against the `primary_container` (#131b2e) navy.\n*   **Do** embrace asymmetry. Center-aligned text is for marketing; left-aligned, structured data is for banking.\n\n### Don't\n*   **Don't** use 1px dividers. If you feel the need for a line, use a `16px` gap or a background color shift instead.\n*   **Don't** use pure greys. All neutrals in this system are \"Slate-informed\" (`surface-variant`, `outline`), ensuring the app feels \"Deep Navy\" and \"Muted Blue\" throughout.\n*   **Don't** use bouncy animations. Transitions should be \"Linear-to-Out\" and fast (200ms), mimicking the snap of a physical page turn or a digital terminal refresh."
+  },
+  "theme": {
+    "color_mode": "LIGHT",
+    "roundness": "ROUND_FOUR",
+    "custom_color": "#0F172A"
+  },
+  "typography": {
+    "headline": "MANROPE",
+    "body": "PUBLIC_SANS",
+    "label": "MANROPE",
+    "general": "MANROPE"
+  },
+  "colors": {
+    "brand": {
+      "primary": "#000000",
+      "secondary": "#515f74",
+      "tertiary": "#000000",
+      "primary_container": "#131b2e",
+      "secondary_container": "#d5e3fc",
+      "tertiary_container": "#002113"
+    },
+    "surface": {
+      "background": "#f7f9fb",
+      "surface": "#f7f9fb",
+      "surface_bright": "#f7f9fb",
+      "surface_dim": "#d8dadc",
+      "surface_variant": "#e0e3e5",
+      "surface_container": "#eceef0",
+      "surface_container_low": "#f2f4f6",
+      "surface_container_lowest": "#ffffff",
+      "surface_container_high": "#e6e8ea",
+      "surface_container_highest": "#e0e3e5"
+    },
+    "semantic": {
+      "error": "#ba1a1a",
+      "error_container": "#ffdad6",
+      "on_error": "#ffffff",
+      "on_error_container": "#93000a"
+    },
+    "text": {
+      "on_background": "#191c1e",
+      "on_surface": "#191c1e",
+      "on_surface_variant": "#45464d",
+      "on_primary": "#ffffff",
+      "on_secondary": "#ffffff",
+      "on_tertiary": "#ffffff",
+      "on_primary_container": "#7c839b",
+      "on_secondary_container": "#57657a",
+      "on_tertiary_container": "#009668"
+    },
+    "outline": {
+      "outline": "#76777d",
+      "outline_variant": "#c6c6cd"
+    },
+    "all": {
+      "background": "#f7f9fb",
+      "error": "#ba1a1a",
+      "error_container": "#ffdad6",
+      "inverse_on_surface": "#eff1f3",
+      "inverse_primary": "#bec6e0",
+      "inverse_surface": "#2d3133",
+      "on_background": "#191c1e",
+      "on_error": "#ffffff",
+      "on_error_container": "#93000a",
+      "on_primary": "#ffffff",
+      "on_primary_container": "#7c839b",
+      "on_primary_fixed": "#131b2e",
+      "on_primary_fixed_variant": "#3f465c",
+      "on_secondary": "#ffffff",
+      "on_secondary_container": "#57657a",
+      "on_secondary_fixed": "#0d1c2e",
+      "on_secondary_fixed_variant": "#3a485b",
+      "on_surface": "#191c1e",
+      "on_surface_variant": "#45464d",
+      "on_tertiary": "#ffffff",
+      "on_tertiary_container": "#009668",
+      "on_tertiary_fixed": "#002113",
+      "on_tertiary_fixed_variant": "#005236",
+      "outline": "#76777d",
+      "outline_variant": "#c6c6cd",
+      "primary": "#000000",
+      "primary_container": "#131b2e",
+      "primary_fixed": "#dae2fd",
+      "primary_fixed_dim": "#bec6e0",
+      "secondary": "#515f74",
+      "secondary_container": "#d5e3fc",
+      "secondary_fixed": "#d5e3fc",
+      "secondary_fixed_dim": "#b9c7df",
+      "surface": "#f7f9fb",
+      "surface_bright": "#f7f9fb",
+      "surface_container": "#eceef0",
+      "surface_container_high": "#e6e8ea",
+      "surface_container_highest": "#e0e3e5",
+      "surface_container_low": "#f2f4f6",
+      "surface_container_lowest": "#ffffff",
+      "surface_dim": "#d8dadc",
+      "surface_tint": "#565e74",
+      "surface_variant": "#e0e3e5",
+      "tertiary": "#000000",
+      "tertiary_container": "#002113",
+      "tertiary_fixed": "#6ffbbe",
+      "tertiary_fixed_dim": "#4edea3"
     }
+  },
+  "screens": [
+    {
+      "id": "c06624407e0c4dcdb26b4f72b3e862ae",
+      "title": "Account Creation",
+      "name": "projects/13262938093905647630/screens/c06624407e0c4dcdb26b4f72b3e862ae"
+    },
+    {
+      "id": "8b38411ce38243ce999f8f75dc061d5c",
+      "title": "Success",
+      "name": "projects/13262938093905647630/screens/8b38411ce38243ce999f8f75dc061d5c"
+    },
+    {
+      "id": "7626f11cb13640e7ac63d2bf0a8e7a8f",
+      "title": "Permissions",
+      "name": "projects/13262938093905647630/screens/7626f11cb13640e7ac63d2bf0a8e7a8f"
+    },
+    {
+      "id": "d1f0f2d64f544c80899901f638ee428a",
+      "title": "Personalization",
+      "name": "projects/13262938093905647630/screens/d1f0f2d64f544c80899901f638ee428a"
+    },
+    {
+      "id": "cddace7fb9c24865bb044843b4e3c901",
+      "title": "Account Creation",
+      "name": "projects/13262938093905647630/screens/cddace7fb9c24865bb044843b4e3c901"
+    },
+    {
+      "id": "2205f25e49584d1b993df83a3597cee5",
+      "title": "Account Creation",
+      "name": "projects/13262938093905647630/screens/2205f25e49584d1b993df83a3597cee5"
+    },
+    {
+      "id": "7012ac6214024725b7fe0167036ff513",
+      "title": "Account Creation",
+      "name": "projects/13262938093905647630/screens/7012ac6214024725b7fe0167036ff513"
+    },
+    {
+      "id": "d3d3f47e059c4317b7ca8d150d6bd1d4",
+      "title": "Account Creation",
+      "name": "projects/13262938093905647630/screens/d3d3f47e059c4317b7ca8d150d6bd1d4"
+    },
+    {
+      "id": "2abed35cfb934551aeb7b52d198a3305",
+      "title": "Account Creation",
+      "name": "projects/13262938093905647630/screens/2abed35cfb934551aeb7b52d198a3305"
+    },
+    {
+      "id": "8653e629733a4e7989c6a5592da1dcab",
+      "title": "Goal Setup",
+      "name": "projects/13262938093905647630/screens/8653e629733a4e7989c6a5592da1dcab"
+    },
+    {
+      "id": "6da7aa01550d4885906ef71a9cb6e01d",
+      "title": "Account Creation",
+      "name": "projects/13262938093905647630/screens/6da7aa01550d4885906ef71a9cb6e01d"
+    },
+    {
+      "id": "3f7462abe1ee4c919c183cf731f201e9",
+      "title": "Account Creation",
+      "name": "projects/13262938093905647630/screens/3f7462abe1ee4c919c183cf731f201e9"
+    },
+    {
+      "id": "dacddec8a10d403fbeae295d015ab0b8",
+      "title": "Welcome Hero",
+      "name": "projects/13262938093905647630/screens/dacddec8a10d403fbeae295d015ab0b8"
+    }
+  ],
+  "_meta": {
+    "extracted_at": "2026-04-17T11:48:43Z",
+    "source": "stitch-mcp",
+    "endpoint": "http://136.111.153.224:8080"
   }
 }
