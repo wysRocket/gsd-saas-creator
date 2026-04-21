@@ -29,7 +29,7 @@ from google.genai import types as genai_types
 
 TEMPLATES_DIR = Path(__file__).parent.parent / "templates"
 STITCH_TEMPLATE = TEMPLATES_DIR / "stitch-template.md"
-GEMINI_MODEL = "gemini-1.5-flash"
+GEMINI_MODEL = "gemini-2.0-flash-001"
 
 # ---------------------------------------------------------------------------
 # Helpers
