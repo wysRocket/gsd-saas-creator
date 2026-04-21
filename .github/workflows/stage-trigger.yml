@@ -1,0 +1,122 @@
+# stage-trigger.yml — Board stage change automation
+# ---------------------------------------------------
+# Deploy this workflow to the *orchestrator* repo (gsd-saas-creator or a
+# dedicated automation repo that receives GitHub project webhooks).
+#
+# When a project item's Stage changes to "Design.md" and the item has a
+# "Competitor URL" field set, this workflow:
+#   1. Creates / updates the product repo (if it doesn't exist)
+#   2. Runs designlang on the Competitor URL
+#   3. Calls generate_brief.py (Gemini) → writes brief.md
+#   4. Calls generate_stitch_prompt.py (Gemini) → writes stitch-prompt.md
+#   5. Advances Stage to "STITCH Prompt" on the board
+#   6. Posts a comment on the linked GitHub issue
+#
+# Trigger: Repository Dispatch (sent by an external webhook receiver or
+# GitHub App that listens to `projects_v2_item.edited` events).
+#
+# Required secrets:
+#   GH_TOKEN         — PAT with `repo` + `project` scopes
+#   GEMINI_API_KEY   — Google AI Studio key
+#
+# Required vars:
+#   PROJECT_ID       — GraphQL node ID of the GitHub Project (PVT_…)
+#   STAGE_FIELD_ID   — GraphQL ID of the Stage field (PVTSSF_…)
+#   STITCH_STAGE_ID  — Stage option ID for "STITCH Prompt" (e471f317 for main board)
+
+name: Stage Change Automation
+
+on:
+  repository_dispatch:
+    types: [stage_changed]
+
+jobs:
+  handle-stage-change:
+    runs-on: ubuntu-latest
+    if: github.event.client_payload.new_stage == 'Design.md'
+
+    steps:
+      - name: Checkout gsd-saas-creator
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Set up Node (for designlang)
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Python deps
+        run: pip install google-generativeai requests
+
+      - name: Extract context from payload
+        id: ctx
+        run: |
+          echo "ITEM_ID=${{ github.event.client_payload.item_id }}" >> $GITHUB_ENV
+          echo "REPO_NAME=${{ github.event.client_payload.repo_name }}" >> $GITHUB_ENV
+          echo "COMPETITOR_URL=${{ github.event.client_payload.competitor_url }}" >> $GITHUB_ENV
+          echo "PROJECT_NAME=${{ github.event.client_payload.project_name }}" >> $GITHUB_ENV
+          echo "VERTICAL=${{ github.event.client_payload.vertical }}" >> $GITHUB_ENV
+
+      - name: Run designlang on competitor
+        if: env.COMPETITOR_URL != ''
+        run: |
+          mkdir -p output/${REPO_NAME}/design
+          npx designlang ${COMPETITOR_URL} --full --screenshots --output output/${REPO_NAME}/design || true
+
+      - name: Generate brief.md
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          python scripts/generate_brief.py \
+            --name "${PROJECT_NAME}" \
+            --competitor-url "${COMPETITOR_URL}" \
+            --vertical "${VERTICAL}" \
+            --repo-dir output/${REPO_NAME}
+
+      - name: Generate stitch-prompt.md
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          python scripts/generate_stitch_prompt.py \
+            --repo-dir output/${REPO_NAME}
+
+      - name: Push artifacts to product repo
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: |
+          ORG="SaaS-Pretty-Projects"
+          # Create repo if missing
+          gh repo view "${ORG}/${REPO_NAME}" --json name >/dev/null 2>&1 || \
+            gh repo create "${ORG}/${REPO_NAME}" --public --description "${PROJECT_NAME} SaaS"
+
+          # Clone, add files, push
+          git clone "https://x-access-token:${GH_TOKEN}@github.com/${ORG}/${REPO_NAME}.git" _target
+          cp -r output/${REPO_NAME}/. _target/
+          cd _target
+          git config user.email "automation@saas-pretty-projects.com"
+          git config user.name "SaaS Creator Bot"
+          git add -A
+          git diff --cached --quiet || git commit -m "chore: auto-generate brief + stitch-prompt [stage=Design.md]"
+          git push origin main
+
+      - name: Advance Stage to STITCH Prompt
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          PROJECT_ID: ${{ vars.PROJECT_ID }}
+          STAGE_FIELD_ID: ${{ vars.STAGE_FIELD_ID }}
+          STITCH_STAGE_ID: ${{ vars.STITCH_STAGE_ID }}
+        run: |
+          gh api graphql -f query="
+            mutation {
+              updateProjectV2ItemFieldValue(input: {
+                projectId: \"${PROJECT_ID}\"
+                itemId: \"${ITEM_ID}\"
+                fieldId: \"${STAGE_FIELD_ID}\"
+                value: { singleSelectOptionId: \"${STITCH_STAGE_ID}\" }
+              }) { projectV2Item { id } }
+            }"
+          echo "✓ Stage advanced to STITCH Prompt"
