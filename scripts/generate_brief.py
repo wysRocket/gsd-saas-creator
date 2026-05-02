@@ -151,6 +151,9 @@ def generate_brief(
             max_output_tokens=2048,
         ),
     )
+    if not response.text:
+        finish = getattr(response, "prompt_feedback", None) or getattr(response, "candidates", None)
+        sys.exit(f"Error: Gemini returned empty response. Check safety filters or API quota. Detail: {finish}")
     return response.text
 
 # ---------------------------------------------------------------------------

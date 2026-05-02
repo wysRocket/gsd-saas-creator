@@ -177,11 +177,11 @@ def main() -> None:
     repo_dir = (ROOT / args.repo_dir).resolve() if not Path(args.repo_dir).is_absolute() else Path(args.repo_dir)
     design_source = (ROOT / args.design_source).resolve() if not Path(args.design_source).is_absolute() else Path(args.design_source)
 
-    if not design_source.exists():
-        sys.exit(f"Error: design source not found: {design_source}")
-
     repo_dir.mkdir(parents=True, exist_ok=True)
-    copy_design_artifacts(design_source, repo_dir)
+    if not args.offline_fixture:
+        if not design_source.exists():
+            sys.exit(f"Error: design source not found: {design_source}")
+        copy_design_artifacts(design_source, repo_dir)
 
     env = os.environ.copy()
     if args.offline_fixture:

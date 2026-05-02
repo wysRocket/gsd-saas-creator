@@ -256,6 +256,9 @@ def generate_design_md(
             max_output_tokens=4096,
         ),
     )
+    if not response.text:
+        finish = getattr(response, "prompt_feedback", None) or getattr(response, "candidates", None)
+        sys.exit(f"Error: Gemini returned empty response. Check safety filters or API quota. Detail: {finish}")
     return _strip_code_fence(response.text)
 
 # ---------------------------------------------------------------------------

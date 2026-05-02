@@ -40,7 +40,10 @@ class WorkflowError(Exception):
 def load_contracts(path: Path = DEFAULT_CONTRACTS) -> dict[str, Any]:
     if not path.exists():
         raise WorkflowError(f"agent contracts not found: {path}")
-    return json.loads(path.read_text())
+    try:
+        return json.loads(path.read_text())
+    except json.JSONDecodeError as exc:
+        raise WorkflowError(f"malformed agent contracts at {path}: {exc}") from exc
 
 
 def repo_path(repo_dir: Path, pattern: str) -> Path:
@@ -198,6 +201,8 @@ def print_route(stage_name: str, contracts: dict[str, Any]) -> None:
         raise WorkflowError(f"unknown stage `{stage_name}`. Known stages: {known}")
 
     agent_name = stage["agent"]
+    if agent_name not in contracts.get("agents", {}):
+        raise WorkflowError(f"stage `{stage_name}` references unknown agent `{agent_name}`")
     agent = contracts["agents"][agent_name]
     print(json.dumps({
         "stage": stage_name,
