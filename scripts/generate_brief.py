@@ -86,6 +86,22 @@ def _load_brief_template() -> str:
         ## Launch Success Metric
     """)
 
+
+def _find_existing_design_language(repo_dir: Path) -> Path | None:
+    candidates = []
+    for pattern in (
+        "design/*design-language.md",
+        "designs/*design-language.md",
+        "*design-language.md",
+        "design-extract-output/*design-language.md",
+    ):
+        candidates.extend(repo_dir.glob(pattern))
+
+    existing = [p for p in candidates if p.exists()]
+    if not existing:
+        return None
+    return sorted(existing, key=lambda p: (p.stat().st_mtime, str(p)))[-1]
+
 # ---------------------------------------------------------------------------
 # Gemini call (google-genai SDK)
 # ---------------------------------------------------------------------------
@@ -135,6 +151,9 @@ def generate_brief(
             max_output_tokens=2048,
         ),
     )
+    if not response.text:
+        finish = getattr(response, "prompt_feedback", None) or getattr(response, "candidates", None)
+        sys.exit(f"Error: Gemini returned empty response. Check safety filters or API quota. Detail: {finish}")
     return response.text
 
 # ---------------------------------------------------------------------------
@@ -158,6 +177,9 @@ def main() -> None:
         dl_path = Path(args.design_language)
         print(f"  → using existing design language: {dl_path}")
         design_language_md = dl_path.read_text()
+    elif existing_dl_path := _find_existing_design_language(repo_dir):
+        print(f"  → using existing design language: {existing_dl_path}")
+        design_language_md = existing_dl_path.read_text()
     else:
         with tempfile.TemporaryDirectory() as tmpdir:
             dl_path = _run_designlang(args.competitor_url, Path(tmpdir))

@@ -8,9 +8,10 @@
 #   1. Creates / updates the product repo (if it doesn't exist)
 #   2. Runs designlang on the Competitor URL
 #   3. Calls generate_brief.py (Gemini) → writes brief.md
-#   4. Calls generate_stitch_prompt.py (Gemini) → writes stitch-prompt.md
-#   5. Advances Stage to "STITCH Prompt" on the board
-#   6. Posts a comment on the linked GitHub issue
+#   4. Calls generate_design_md.py (Gemini) → writes design.md
+#   5. Calls generate_stitch_prompt.py (Gemini) → writes stitch-prompt.md
+#   6. Advances Stage to "STITCH Prompt" on the board
+#   7. Posts a comment on the linked GitHub issue
 #
 # Trigger: Repository Dispatch (sent by an external webhook receiver or
 # GitHub App that listens to `projects_v2_item.edited` events).
@@ -65,26 +66,52 @@ jobs:
         if: env.COMPETITOR_URL != ''
         run: |
           mkdir -p output/${REPO_NAME}/design
-          npx designlang ${COMPETITOR_URL} --full --screenshots --out output/${REPO_NAME}/design || true
+          npx designlang "${COMPETITOR_URL}" --full --screenshots --out "output/${REPO_NAME}/design" || true
 
       - name: Generate brief.md
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
-          pip install --quiet google-genai
+          python scripts/agent_workflow.py record-stage brief \
+            --repo-dir output/${REPO_NAME} \
+            --status started \
+            --message "Generating brief.md"
           python scripts/generate_brief.py \
             --name "${PROJECT_NAME}" \
             --competitor-url "${COMPETITOR_URL}" \
             --vertical "${VERTICAL}" \
             --repo-dir output/${REPO_NAME}
+          python scripts/agent_workflow.py validate-stage brief \
+            --repo-dir output/${REPO_NAME} \
+            --log
+
+      - name: Generate design.md
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          python scripts/agent_workflow.py record-stage design_md \
+            --repo-dir output/${REPO_NAME} \
+            --status started \
+            --message "Generating design.md"
+          python scripts/generate_design_md.py \
+            --repo-dir output/${REPO_NAME}
+          python scripts/agent_workflow.py validate-stage design_md \
+            --repo-dir output/${REPO_NAME} \
+            --log
 
       - name: Generate stitch-prompt.md
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
-          pip install --quiet google-genai
+          python scripts/agent_workflow.py record-stage stitch_prompt \
+            --repo-dir output/${REPO_NAME} \
+            --status started \
+            --message "Generating stitch-prompt.md"
           python scripts/generate_stitch_prompt.py \
             --repo-dir output/${REPO_NAME}
+          python scripts/agent_workflow.py validate-stage stitch_prompt \
+            --repo-dir output/${REPO_NAME} \
+            --log
 
       - name: Push artifacts to product repo
         env:
@@ -95,14 +122,14 @@ jobs:
           gh repo view "${ORG}/${REPO_NAME}" --json name >/dev/null 2>&1 || \
             gh repo create "${ORG}/${REPO_NAME}" --public --description "${PROJECT_NAME} SaaS"
 
-          # Clone, add files, push
-          git clone "https://x-access-token:${GH_TOKEN}@github.com/${ORG}/${REPO_NAME}.git" _target
-          cp -r output/${REPO_NAME}/. _target/
+          # Clone, add files, push (gh handles auth via GH_TOKEN — avoids token in URL)
+          gh repo clone "${ORG}/${REPO_NAME}" _target
+          cp -r "output/${REPO_NAME}/." _target/
           cd _target
           git config user.email "automation@saas-pretty-projects.com"
           git config user.name "SaaS Creator Bot"
           git add -A
-          git diff --cached --quiet || git commit -m "chore: auto-generate brief + stitch-prompt [stage=Design.md]"
+          git diff --cached --quiet || git commit -m "chore: auto-generate brief, design, and stitch prompt [stage=Design.md]"
           git push origin main
 
       - name: Advance Stage to STITCH Prompt

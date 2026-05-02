@@ -85,8 +85,12 @@ Orchestrates a specialized team of AI agents to transform a single natural langu
 |---|---|
 | `scripts/extract_dna.py` | Pull design tokens from Stitch API |
 | `scripts/render_templates.py` | Render Jinja2 templates with extracted data |
+| `scripts/generate_design_md.py` | Generate canonical `design.md` from `brief.md` + designlang artifacts |
+| `scripts/agent_workflow.py` | Route agent stages, validate artifacts, and write `pipeline-events.jsonl` |
+| `scripts/dry_run_design_pipeline.py` | Run the Design.md automation locally with live Gemini or offline fixtures |
 | `scripts/scaffold.py` | Generate project skeleton from DESIGN.md |
 | `scripts/deploy.py` | Provision Firebase + trigger deployment |
+| `templates/agent-contracts.json` | Executable PM/Engineer/QA/DevOps stage contracts |
 | `templates/DESIGN.md.j2` | Design DNA document template |
 | `templates/REQUIREMENTS.md.j2` | Requirements document template |
 | `templates/deploy.yml.j2` | GitHub Actions CI/CD workflow template |

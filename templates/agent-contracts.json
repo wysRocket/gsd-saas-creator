@@ -1,0 +1,102 @@
+{
+  "version": "1.0.0",
+  "description": "Executable agent contracts for the GSD SaaS Creator pipeline.",
+  "agents": {
+    "@pm": {
+      "role": "Product Manager",
+      "owns": ["requirements", "brief"],
+      "must": [
+        "Translate user intent into concrete product scope.",
+        "Preserve halt gates before engineering work starts.",
+        "Keep product artifacts concise enough for downstream generators."
+      ]
+    },
+    "@engineer": {
+      "role": "Software Engineer",
+      "owns": ["design_language", "design_md", "stitch_prompt", "architecture", "code_generation"],
+      "must": [
+        "Use designlang artifacts as the source of truth for visual tokens.",
+        "Generate design.md before stitch-prompt.md.",
+        "Avoid inventing design tokens when extracted artifacts exist."
+      ]
+    },
+    "@qa": {
+      "role": "Quality Assurance",
+      "owns": ["qa"],
+      "must": [
+        "Run deterministic artifact checks before any stage advance.",
+        "Treat missing files, unresolved placeholders, and empty token values as blockers.",
+        "Record validation results in pipeline-events.jsonl."
+      ]
+    },
+    "@devops": {
+      "role": "DevOps Engineer",
+      "owns": ["deploy"],
+      "must": [
+        "Push only generated artifacts that passed validation.",
+        "Advance board stages only after required outputs exist.",
+        "Keep secrets in GitHub, Firebase, Cloudflare, or Hostinger secret stores."
+      ]
+    }
+  },
+  "stages": {
+    "brief": {
+      "agent": "@pm",
+      "description": "Generate the structured product brief.",
+      "required_inputs": ["design/*design-language.md"],
+      "required_outputs": ["brief.md"],
+      "checks": ["brief_present"],
+      "next_stage": "design_md"
+    },
+    "design_md": {
+      "agent": "@engineer",
+      "description": "Generate canonical design.md from brief plus designlang artifacts.",
+      "required_inputs": [
+        "brief.md",
+        "templates/design-template.md",
+        "design/*design-language.md"
+      ],
+      "required_outputs": ["design.md"],
+      "checks": [
+        "design_md_present",
+        "no_template_placeholders",
+        "real_design_tokens",
+        "designlang_reference_present"
+      ],
+      "next_stage": "stitch_prompt"
+    },
+    "stitch_prompt": {
+      "agent": "@engineer",
+      "description": "Generate STITCH prompt from brief, design.md, and designlang artifacts.",
+      "required_inputs": [
+        "brief.md",
+        "design.md",
+        "templates/stitch-template.md",
+        "design/*design-language.md"
+      ],
+      "required_outputs": ["stitch-prompt.md"],
+      "checks": [
+        "stitch_prompt_present",
+        "no_template_placeholders",
+        "stitch_uses_design_md"
+      ],
+      "next_stage": "qa"
+    },
+    "qa": {
+      "agent": "@qa",
+      "description": "Validate generated artifacts before board stage advancement.",
+      "required_inputs": ["brief.md", "design.md", "stitch-prompt.md"],
+      "required_outputs": ["pipeline-events.jsonl"],
+      "checks": ["artifact_set_complete"],
+      "next_stage": "deploy"
+    },
+    "deploy": {
+      "agent": "@devops",
+      "description": "Push generated artifacts and advance the project board.",
+      "required_inputs": ["brief.md", "design.md", "stitch-prompt.md", "pipeline-events.jsonl"],
+      "required_outputs": [],
+      "checks": ["artifact_set_complete"],
+      "next_stage": null
+    }
+  }
+}
