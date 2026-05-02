@@ -151,6 +151,10 @@ Using `templates/design-template.md` as scaffold, populate from:
 - Brief structured fields (screens, tone, personas, pricing)
 - designlang `*-design-language.md` (real colors, fonts, spacing, components)
 
+```bash
+python scripts/generate_design_md.py --repo-dir ./output/<repo-name>
+```
+
 Commit as `design.md` in repo root.
 
 ### Step 4 — Craft stitch-prompt.md

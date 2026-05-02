@@ -5,6 +5,7 @@ The `gsd-saas-creator` is a standalone Agent Skill designed to automate the end-
 ## Features
 - **Design DNA Extraction**: Automated retrieval of visual tokens from Google Stitch.
 - **Autonomous Orchestration**: Multi-agent workflow involving PM, Engineering, QA, and DevOps roles.
+- **Executable Agent Contracts**: PM/Engineering/QA/DevOps stage contracts with validation gates and JSONL event logs.
 - **Safe Deployment**: Built-in Halt Gates for user approval at critical stages.
 - **Modern Tech Stack**: Integrated with React, Firebase, and GitHub Actions.
 

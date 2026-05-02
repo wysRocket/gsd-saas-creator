@@ -3,7 +3,7 @@
 Receives `projects_v2_item.edited` GitHub webhook events and fires a
 `repository_dispatch` to `gsd-saas-creator` when a board item moves to
 the **Design.md** stage. This triggers the full pipeline:
-designlang → `generate_brief.py` → `generate_stitch_prompt.py`.
+designlang → `generate_brief.py` → `generate_design_md.py` → `generate_stitch_prompt.py`.
 
 ## Quick deploy
 
@@ -46,9 +46,10 @@ Worker (this file)
   ▼
 GitHub Action (stage-trigger.yml)
   │  runs designlang on Competitor URL
-  │  runs generate_brief.py    (Gemini)
+  │  runs generate_brief.py       (Gemini)
+  │  runs generate_design_md.py   (Gemini)
   │  runs generate_stitch_prompt.py (Gemini)
-  │  pushes brief.md + stitch-prompt.md to product repo
+  │  pushes brief.md + design.md + stitch-prompt.md to product repo
   │  advances Stage → "STITCH Prompt" on board
 ```
 
