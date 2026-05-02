@@ -3,7 +3,7 @@
  * ==========================================
  * Receives GitHub `projects_v2_item.edited` webhook events and
  * fires a `repository_dispatch` to gsd-saas-creator when the Stage
- * field changes to "Design.md".
+ * field changes to "Ready" (triggers full pipeline) or "Design.md" (legacy).
  *
  * Deploy:
  *   cd webhook-receiver
@@ -27,6 +27,9 @@ export interface Env {
   REPO_OWNER: string;
   REPO_NAME: string;
 }
+
+// Stages that trigger the full SaaS creation pipeline
+const TRIGGER_STAGES = new Set(["Ready", "Design.md"]);
 
 // ---------------------------------------------------------------------------
 // HMAC-SHA256 signature verification
@@ -175,7 +178,7 @@ export default {
 
     // Health check
     if (url.pathname === "/" || url.pathname === "/health") {
-      return new Response(JSON.stringify({ status: "ok" }), {
+      return new Response(JSON.stringify({ status: "ok", trigger_stages: [...TRIGGER_STAGES] }), {
         headers: { "Content-Type": "application/json" },
       });
     }
@@ -219,8 +222,8 @@ export default {
     const change = extractFieldChange(payload);
     const newStage: string = change?.to?.name ?? "";
 
-    // Only trigger on "Design.md" stage
-    if (newStage !== "Design.md") {
+    // Trigger on "Ready" (full pipeline) or "Design.md" (legacy partial trigger)
+    if (!TRIGGER_STAGES.has(newStage)) {
       return new Response(`Ignored (stage=${newStage})`, { status: 200 });
     }
 
@@ -234,6 +237,7 @@ export default {
     const repoUrl: string = fields["Repo URL"] ?? "";
     const vertical: string = fields["Vertical"] ?? "";
     const priority: string = fields["Priority"] ?? "5";
+    const stitchProjectId: string = fields["Stitch Project ID"] ?? "";
 
     // Derive repo name from Repo URL or item title
     const repoName: string =
@@ -264,13 +268,14 @@ export default {
         project_name: projectName,
         vertical,
         priority,
+        stitch_project_id: stitchProjectId,
       }
     );
 
     if (dispatched) {
-      console.log(`[pipeline] dispatched stage_changed for ${projectName} (${repoName})`);
+      console.log(`[pipeline] dispatched stage_changed for ${projectName} (${repoName}) stage=${newStage}`);
       return new Response(
-        JSON.stringify({ message: "Pipeline triggered", repo: repoName }),
+        JSON.stringify({ message: "Pipeline triggered", repo: repoName, stage: newStage }),
         { headers: { "Content-Type": "application/json" }, status: 200 }
       );
     } else {

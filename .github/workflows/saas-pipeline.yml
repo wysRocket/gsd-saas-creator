@@ -1,0 +1,117 @@
+# saas-pipeline.yml
+# Triggered by repository_dispatch from the Cloudflare webhook receiver.
+# Runs the SaaS creation pipeline: PM → Stitch → Engineer → QA → DevOps
+
+name: SaaS Creation Pipeline
+
+on:
+  repository_dispatch:
+    types: [stage_changed]
+
+concurrency:
+  group: saas-pipeline-${{ github.event.client_payload.repo_name }}
+  cancel-in-progress: false
+
+jobs:
+  pipeline:
+    name: Run SaaS Pipeline
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    env:
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      GOOGLE_CLOUD_PROJECT: ${{ secrets.GOOGLE_CLOUD_PROJECT }}
+      GOOGLE_CLOUD_LOCATION: global
+      GOOGLE_GENAI_USE_VERTEXAI: "True"
+      GITHUB_TOKEN: ${{ secrets.GH_PAT }}
+      GITHUB_ORG: SaaS-Pretty-Projects
+      FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+      STITCH_MCP_ENDPOINT: ${{ secrets.STITCH_MCP_ENDPOINT }}
+      STITCH_API_KEY: ${{ secrets.STITCH_API_KEY }}
+      PIPELINE_REPO_ROOT: ${{ github.workspace }}
+      PIPELINE_OUTPUT_DIR: ${{ github.workspace }}/output
+
+      # Board payload from webhook
+      PROJECT_NAME: ${{ github.event.client_payload.project_name }}
+      COMPETITOR_URL: ${{ github.event.client_payload.competitor_url }}
+      VERTICAL: ${{ github.event.client_payload.vertical }}
+      REPO_NAME: ${{ github.event.client_payload.repo_name }}
+      STITCH_PROJECT_ID: ${{ github.event.client_payload.stitch_project_id }}
+      BOARD_ITEM_ID: ${{ github.event.client_payload.item_id }}
+      BOARD_PROJECT_ID: ${{ github.event.client_payload.project_id }}
+      NEW_STAGE: ${{ github.event.client_payload.new_stage }}
+
+    steps:
+      - name: Checkout gsd-saas-creator
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        run: curl -LsSf https://astral.sh/uv/install.sh | sh && echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+
+      - name: Install pipeline agent dependencies
+        working-directory: agents/saas-pipeline
+        run: uv sync
+
+      - name: Install gsd-saas-creator script dependencies
+        run: uv pip install --system google-genai requests
+
+      - name: Set up Node.js (for scaffold + tests)
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Compute repo_dir
+        run: |
+          REPO_DIR="$PIPELINE_OUTPUT_DIR/$REPO_NAME"
+          echo "REPO_DIR=$REPO_DIR" >> $GITHUB_ENV
+          mkdir -p "$REPO_DIR"
+
+      - name: "[1/5] @pm — Generate brief.md"
+        working-directory: agents/saas-pipeline
+        run: |
+          uv run agents-cli run \
+            "Generate brief for '$PROJECT_NAME'. competitor_url='$COMPETITOR_URL', vertical='$VERTICAL', repo_dir='$REPO_DIR'"
+
+      - name: "[2/5] @stitch — Extract Stitch design DNA"
+        working-directory: agents/saas-pipeline
+        run: |
+          STITCH_MSG="Extract design DNA for '$PROJECT_NAME'. stitch_project_id='$STITCH_PROJECT_ID', output='$REPO_DIR/design_tokens.json'"
+          if [ -z "$STITCH_PROJECT_ID" ]; then
+            STITCH_MSG="No Stitch project ID provided for '$PROJECT_NAME'. Use the fallback reference schema."
+          fi
+          uv run agents-cli run "$STITCH_MSG"
+
+      - name: "[3/5] @engineer — Generate design + scaffold code"
+        working-directory: agents/saas-pipeline
+        run: |
+          uv run agents-cli run \
+            "Generate design.md, stitch-prompt.md, and scaffold the full project for '$PROJECT_NAME'. repo_dir='$REPO_DIR'"
+
+      - name: "[4/5] @qa — Validate artifacts and run tests"
+        working-directory: agents/saas-pipeline
+        run: |
+          uv run agents-cli run \
+            "Validate all pipeline artifacts and run npm tests for '$PROJECT_NAME'. repo_dir='$REPO_DIR'"
+
+      - name: "[5/5] @devops — Deploy to Firebase"
+        if: ${{ github.event.client_payload.new_stage == 'Deploy' || github.event.client_payload.new_stage == 'Ready' }}
+        working-directory: agents/saas-pipeline
+        env:
+          FIREBASE_PROJECT_ID: ${{ github.event.client_payload.repo_name }}
+          GITHUB_REPO: ${{ github.repository_owner }}/${{ github.event.client_payload.repo_name }}
+        run: |
+          uv run agents-cli run \
+            "Deploy '$PROJECT_NAME' to Firebase. repo_dir='$REPO_DIR', dry_run=False"
+
+      - name: Upload pipeline events log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pipeline-events-${{ github.event.client_payload.repo_name }}
+          path: output/${{ github.event.client_payload.repo_name }}/pipeline-events.jsonl
+          if-no-files-found: ignore
