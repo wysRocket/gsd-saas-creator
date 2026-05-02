@@ -1,0 +1,72 @@
+[project]
+name = "saas-pipeline"
+version = "0.1.0"
+description = "Multi-agent ADK pipeline for automated SaaS creation from GitHub Projects board"
+authors = [
+    {name = "GSD SaaS Creator", email = "dev@example.com"},
+]
+dependencies = [
+    "google-adk>=1.15.0,<2.0.0",
+    "opentelemetry-instrumentation-google-genai>=0.1.0,<1.0.0",
+    "gcsfs>=2024.11.0",
+    "google-cloud-logging>=3.12.0,<4.0.0",
+    "httpx>=0.27.0,<1.0.0",
+    "google-genai>=1.0.0,<2.0.0",
+    "requests>=2.32.0,<3.0.0",
+]
+requires-python = ">=3.11,<3.14"
+
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3.4,<9.0.0",
+    "pytest-asyncio>=0.23.8,<1.0.0",
+    "nest-asyncio>=1.6.0,<2.0.0",
+]
+
+[project.optional-dependencies]
+eval = [
+    "google-adk[eval]>=1.15.0,<2.0.0",
+]
+lint = [
+    "ruff>=0.4.6,<1.0.0",
+    "ty>=0.0.1a0",
+    "codespell>=2.2.0,<3.0.0",
+]
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "C", "B", "UP", "RUF"]
+ignore = ["E501", "C901", "B006"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["app"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.pytest.ini_options]
+pythonpath = "."
+asyncio_default_fixture_loop_scope = "function"
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]
+
+[tool.agents-cli]
+name = "saas-pipeline"
+description = "Multi-agent SaaS creation pipeline: PM -> Stitch -> Engineer -> QA -> DevOps"
+base_template = "adk"
+agent_directory = "app"
+generated_at = "2026-04-30T00:00:00.000000+00:00"
+acli_version = "0.1.1"
+
+[tool.agents-cli.create_params]
+deployment_target = "none"
+session_type = "in_memory"
+cicd_runner = "skip"
+include_data_ingestion = false
+datastore = "none"

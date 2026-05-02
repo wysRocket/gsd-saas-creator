@@ -1,0 +1,54 @@
+{
+  "evalset": [
+    {
+      "id": "brief-01",
+      "description": "PM agent generates a brief for a gaming SaaS",
+      "input": {
+        "role": "user",
+        "parts": [
+          {
+            "text": "Generate a product brief for 'Terrastone' — a browser-based strategy game SaaS. Competitor URL: https://kingdomofarcane.com, Vertical: Gaming, repo_dir: /tmp/test-terrastone"
+          }
+        ]
+      },
+      "expected_tool_calls": [
+        {
+          "name": "generate_brief",
+          "args_match": {
+            "project_name": "Terrastone",
+            "vertical": "Gaming"
+          }
+        },
+        {
+          "name": "validate_stage",
+          "args_match": {
+            "stage": "brief"
+          }
+        }
+      ],
+      "criteria": {
+        "tool_trajectory_avg_score": 1.0
+      }
+    },
+    {
+      "id": "brief-02",
+      "description": "PM agent handles missing competitor URL gracefully",
+      "input": {
+        "role": "user",
+        "parts": [
+          {
+            "text": "Generate a product brief for 'CloudBase' — a developer tools SaaS. No competitor URL. Vertical: Developer Tools, repo_dir: /tmp/test-cloudbase"
+          }
+        ]
+      },
+      "expected_tool_calls": [
+        {
+          "name": "generate_brief"
+        }
+      ],
+      "criteria": {
+        "tool_trajectory_avg_score": 1.0
+      }
+    }
+  ]
+}
