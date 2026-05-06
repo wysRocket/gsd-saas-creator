@@ -108,6 +108,19 @@ jobs:
           uv run agents-cli run \
             "Deploy '$PROJECT_NAME' to Firebase. repo_dir='$REPO_DIR', dry_run=False"
 
+      - name: Upload design artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: design-artifacts-${{ github.event.client_payload.repo_name }}
+          path: |
+            output/${{ github.event.client_payload.repo_name }}/brief.md
+            output/${{ github.event.client_payload.repo_name }}/design.md
+            output/${{ github.event.client_payload.repo_name }}/stitch-prompt.md
+            output/${{ github.event.client_payload.repo_name }}/design_tokens.json
+            output/${{ github.event.client_payload.repo_name }}/design/
+          if-no-files-found: ignore
+
       - name: Upload pipeline events log
         if: always()
         uses: actions/upload-artifact@v4
