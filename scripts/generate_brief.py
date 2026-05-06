@@ -167,10 +167,20 @@ def main() -> None:
     parser.add_argument("--vertical", default="Other", help="Business vertical")
     parser.add_argument("--repo-dir", default="./output", help="Target repo directory")
     parser.add_argument("--design-language", help="Path to existing design-language.md")
+    parser.add_argument("--force", action="store_true", help="Regenerate even if brief.md exists")
     args = parser.parse_args()
 
     repo_dir = Path(args.repo_dir)
     repo_dir.mkdir(parents=True, exist_ok=True)
+
+    out_path = repo_dir / "brief.md"
+
+    # Idempotent: skip if already generated (unless --force)
+    if out_path.exists() and not args.force:
+        existing = out_path.read_text().strip()
+        if existing:
+            print(f"  → brief.md already exists ({len(existing):,} chars), skipping. Use --force to regenerate.")
+            return
 
     # Step 1 — get design language
     if args.design_language and Path(args.design_language).exists():
@@ -200,7 +210,6 @@ def main() -> None:
         template=template,
     )
 
-    out_path = repo_dir / "brief.md"
     out_path.write_text(brief_md)
     print(f"\n✓ brief.md written to {out_path} ({len(brief_md):,} chars)")
 
