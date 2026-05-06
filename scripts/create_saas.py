@@ -91,14 +91,12 @@ def _token():
 def _gh_graphql(query: str, variables: dict | None = None) -> dict:
     """Run a GraphQL query via gh CLI."""
     import json
-    var_arg = ""
-    if variables:
-        var_arg = " ".join(f"-f {k}={v!r}" for k, v in variables.items())
+    payload = {"query": query, "variables": variables or {}}
     result = subprocess.run(
-        ["gh", "api", "graphql", "-f", f"query={query}"] + (
-            [f"variables={json.dumps(variables)}"] if variables else []
-        ),
-        capture_output=True, text=True
+        ["gh", "api", "graphql", "--input", "-"],
+        input=json.dumps(payload),
+        capture_output=True,
+        text=True,
     )
     data = json.loads(result.stdout)
     if "errors" in data:
@@ -109,11 +107,13 @@ def _gh_graphql(query: str, variables: dict | None = None) -> dict:
 def _postgraphql(query: str, variables: dict | None = None) -> dict:
     """Run a GraphQL mutation via gh CLI."""
     import json
-    cmd = ["gh", "api", "graphql", "-f", f"query={query}"]
-    if variables:
-        cmd.append("-f")
-        cmd.append(f"variables={json.dumps(variables)}")
-    result = subprocess.run(cmd, capture_output=True, text=True)
+    payload = {"query": query, "variables": variables or {}}
+    result = subprocess.run(
+        ["gh", "api", "graphql", "--input", "-"],
+        input=json.dumps(payload),
+        capture_output=True,
+        text=True,
+    )
     data = json.loads(result.stdout)
     if "errors" in data:
         sys.exit(f"GraphQL errors: {json.dumps(data['errors'], indent=2)}")
@@ -154,7 +154,7 @@ def create_draft_issue(project_name: str, competitor_url: str, vertical: str) ->
 
     # First get the repo node ID
     repo_data = _gh_graphql(
-        "query { repository(owner: $org, name: $name) { id } }",
+        "query RepositoryId($org: String!, $name: String!) { repository(owner: $org, name: $name) { id } }",
         {"org": ORG, "name": "gsd-saas-creator"}
     )
     repo_id = repo_data["repository"]["id"]
@@ -275,15 +275,8 @@ def dispatch_pipeline(
             "comment_body": "",
         },
     }
-    cmd = [
-        "gh", "api",
-        f"repos/{ORG}/gsd-saas-creator/dispatches",
-        "-F", f"event_type=stage_changed",
-        "-F", f"client_payload={json.dumps(payload)}",
-        "--input", "-",
-    ]
-    # Use --jq to suppress output, check return code
-    result = subprocess.run(cmd, input=json.dumps(payload).encode(), capture_output=True)
+    cmd = ["gh", "api", f"repos/{ORG}/gsd-saas-creator/dispatches", "--method", "POST", "--input", "-"]
+    result = subprocess.run(cmd, input=json.dumps(payload), capture_output=True, text=True)
     if result.returncode != 0 and "Nothing to see here" not in result.stderr:
         print(f"  [warning] dispatch may have failed: {result.stderr[:200]}")
     else:

@@ -99,7 +99,12 @@ def _gh_graphql(query: str) -> dict:
         capture_output=True, text=True
     )
     import json
-    data = json.loads(result.stdout)
+    if result.returncode != 0:
+        return {}
+    try:
+        data = json.loads(result.stdout)
+    except json.JSONDecodeError:
+        return {}
     if "errors" in data:
         print(json.dumps(data["errors"], indent=2), file=sys.stderr)
     return data.get("data", {})
@@ -319,8 +324,7 @@ def watch_board(interval: int = 60):
                 first = False
             else:
                 # Report changes
-                prev = {i["item_id"]: i for i in [
-                    dict(item_id="__placeholder")] * 0}  # will re-fetch
+                prev = {}
                 # Just show current state in watch mode
                 fmt_board_summary(items)
                 if new_ids:
@@ -374,7 +378,10 @@ def main():
             s = i["stage"] or "(none)"
             by_stage[s] = by_stage.get(s, 0) + 1
         print("\nBy stage:")
-        for k in sorted(by_stage, key=lambda s: STAGE_ORDER.index(s) if s in STAGE_ORDER else 99):
+        for k in sorted(
+            by_stage,
+            key=lambda s: STAGE_ORDER.index(classify({"Stage": s})) if classify({"Stage": s}) in STAGE_ORDER else 99,
+        ):
             print(f"  {k:<20} {by_stage[k]}")
 
 

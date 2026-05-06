@@ -70,12 +70,12 @@ def check_stage_coverage(contracts: dict) -> list[str]:
 
     for stage_name, stage in contracts.get("stages", {}).items():
         # Resolve aliases
-        handler_key = KNOWN_ALIASES.get(stage_name, stage_name)
+        handler_key = KNOWN_ALIASES.get(stage_name, f"handle_{stage_name}")
         if handler_key == "passive" or stage_name in PASSIVE_STAGES:
             continue  # passive — handled by handle_passive generically
 
         # Check for handler function
-        if handler_key not in code:
+        if not re.search(rf"^def\s+{re.escape(handler_key)}\s*\(", code, re.MULTILINE):
             issues.append(
                 f"stage '{stage_name}' has no handler in orchestrate.py "
                 f"(expected def {handler_key})"
