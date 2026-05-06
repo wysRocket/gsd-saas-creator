@@ -16,6 +16,7 @@ Environment variables:
     FONT_SANS         — font family name (default: Inter)
 """
 
+import argparse
 import os
 import sys
 import json
@@ -28,14 +29,11 @@ def load_env(key: str, default: str = "") -> str:
     return os.environ.get(key, default)
 
 
-PROJECT_NAME = load_env("PROJECT_NAME", "my-saas-app")
-OUTPUT_DIR = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("output") / PROJECT_NAME.lower().replace(" ", "-")
-
 # ---------------------------------------------------------------------------
 # Design token loading (from designlang output)
 # ---------------------------------------------------------------------------
 
-def _load_design_tokens() -> dict:
+def _load_design_tokens(output_dir: Path) -> dict:
     """Load design tokens from DESIGN_TOKENS env path or look in common locations."""
     token_path = os.environ.get("DESIGN_TOKENS", "")
     candidates = []
@@ -43,8 +41,8 @@ def _load_design_tokens() -> dict:
         candidates.append(Path(token_path))
     # Auto-discover in output dir or cwd
     candidates += [
-        OUTPUT_DIR / "design" / "design-tokens.json",
-        OUTPUT_DIR / "design-tokens.json",
+        output_dir / "design" / "design-tokens.json",
+        output_dir / "design-tokens.json",
         Path("design-tokens.json"),
     ]
     for p in candidates:
@@ -106,17 +104,12 @@ def _extract_fonts(tokens: dict) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# File content generators (populated after token loading)
+# File content generators
 # ---------------------------------------------------------------------------
 
-_TOKENS = _load_design_tokens()
-_COLORS = _extract_colors(_TOKENS)
-_FONTS  = _extract_fonts(_TOKENS)
-
-
-def package_json() -> str:
+def package_json(project_name: str) -> str:
     return json.dumps({
-        "name": PROJECT_NAME.lower().replace(" ", "-"),
+        "name": project_name.lower().replace(" ", "-"),
         "version": "0.1.0",
         "private": True,
         "scripts": {
@@ -156,15 +149,15 @@ def package_json() -> str:
     }, indent=2)
 
 
-def tailwind_config() -> str:
-    primary = _COLORS["primary"]
-    secondary = _COLORS["secondary"]
-    background = _COLORS["background"]
-    foreground = _COLORS["foreground"]
-    muted = _COLORS["muted"]
-    border = _COLORS["border"]
-    font_sans = _FONTS["sans"]
-    font_heading = _FONTS["heading"]
+def tailwind_config(colors: dict, fonts: dict) -> str:
+    primary = colors["primary"]
+    secondary = colors["secondary"]
+    background = colors["background"]
+    foreground = colors["foreground"]
+    muted = colors["muted"]
+    border = colors["border"]
+    font_sans = fonts["sans"]
+    font_heading = fonts["heading"]
 
     return textwrap.dedent(f"""\
         /** @type {{import('tailwindcss').Config}} */
@@ -330,8 +323,8 @@ def button_component_tsx() -> str:
     """)
 
 
-def index_page_tsx() -> str:
-    primary = _COLORS["primary"]
+def index_page_tsx(project_name: str, colors: dict, fonts: dict) -> str:
+    primary = colors["primary"]
     return textwrap.dedent(f"""\
         import type {{ NextPage }} from "next";
         import Head from "next/head";
@@ -341,10 +334,10 @@ def index_page_tsx() -> str:
           return (
             <>
               <Head>
-                <title>{PROJECT_NAME}</title>
+                <title>{project_name}</title>
               </Head>
               <main className="flex min-h-screen flex-col items-center justify-center p-8 bg-background text-foreground">
-                <h1 className="font-heading text-5xl font-bold mb-4">{PROJECT_NAME}</h1>
+                <h1 className="font-heading text-5xl font-bold mb-4">{project_name}</h1>
                 <p className="text-muted mb-8 text-lg">Your SaaS is ready. Start building.</p>
                 <Button size="lg">Get Started</Button>
               </main>
@@ -356,13 +349,13 @@ def index_page_tsx() -> str:
     """)
 
 
-def global_css() -> str:
-    primary = _COLORS["primary"]
-    secondary = _COLORS["secondary"]
-    background = _COLORS["background"]
-    foreground = _COLORS["foreground"]
-    muted = _COLORS["muted"]
-    border = _COLORS["border"]
+def global_css(colors: dict) -> str:
+    primary = colors["primary"]
+    secondary = colors["secondary"]
+    background = colors["background"]
+    foreground = colors["foreground"]
+    muted = colors["muted"]
+    border = colors["border"]
     return textwrap.dedent(f"""\
         @tailwind base;
         @tailwind components;
@@ -487,48 +480,64 @@ def gitignore() -> str:
 # Scaffold runner
 # ---------------------------------------------------------------------------
 
-FILES: dict[str, str] = {
-    "package.json": package_json(),
-    "tailwind.config.js": tailwind_config(),
-    "next.config.js": next_config(),
-    "tsconfig.json": tsconfig_json(),
-    "postcss.config.js": postcss_config(),
-    "jest.config.js": jest_config(),
-    "jest.setup.ts": jest_setup(),
-    ".gitignore": gitignore(),
-    ".env.local.example": env_local_example(),
-    "firestore.rules": firestore_rules(),
-    "src/lib/firebase.ts": firebase_config_ts(),
-    "src/lib/utils.ts": cn_util_ts(),
-    "src/components/ui/button.tsx": button_component_tsx(),
-    "src/pages/index.tsx": index_page_tsx(),
-    "src/styles/globals.css": global_css(),
-    "src/components/.gitkeep": "",
-    "src/hooks/.gitkeep": "",
-    "functions/.gitkeep": "",
-}
+def scaffold(project_name: str, output_dir: Path) -> None:
+    tokens = _load_design_tokens(output_dir)
+    colors = _extract_colors(tokens)
+    fonts  = _extract_fonts(tokens)
 
+    files: dict[str, str] = {
+        "package.json": package_json(project_name),
+        "tailwind.config.js": tailwind_config(colors, fonts),
+        "next.config.js": next_config(),
+        "tsconfig.json": tsconfig_json(),
+        "postcss.config.js": postcss_config(),
+        "jest.config.js": jest_config(),
+        "jest.setup.ts": jest_setup(),
+        ".gitignore": gitignore(),
+        ".env.local.example": env_local_example(),
+        "firestore.rules": firestore_rules(),
+        "src/lib/firebase.ts": firebase_config_ts(),
+        "src/lib/utils.ts": cn_util_ts(),
+        "src/components/ui/button.tsx": button_component_tsx(),
+        "src/pages/index.tsx": index_page_tsx(project_name, colors, fonts),
+        "src/styles/globals.css": global_css(colors),
+        "src/components/.gitkeep": "",
+        "src/hooks/.gitkeep": "",
+        "functions/.gitkeep": "",
+    }
 
-def scaffold() -> None:
-    print(f"Scaffolding project: {PROJECT_NAME}")
-    print(f"Output directory:    {OUTPUT_DIR}")
-    print(f"Primary color:       {_COLORS['primary']}")
-    print(f"Font family:         {_FONTS['sans']}\n")
+    print(f"Scaffolding project: {project_name}")
+    print(f"Output directory:    {output_dir}")
+    print(f"Primary color:       {colors['primary']}")
+    print(f"Font family:         {fonts['sans']}\n")
 
-    for rel_path, content in FILES.items():
-        target = OUTPUT_DIR / rel_path
+    for rel_path, content in files.items():
+        target = output_dir / rel_path
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(content)
         print(f"  created  {rel_path}")
 
-    print(f"\nDone. {len(FILES)} files written to {OUTPUT_DIR}/")
-    print("\nNext steps:")
-    print("  1. cd into the directory")
-    print("  2. cp .env.local.example .env.local && fill in Firebase config")
-    print("  3. npm install")
-    print("  4. npx shadcn-ui@latest init  (add more components as needed)")
-    print("  5. npm run dev")
+    print(f"\nDone. {len(files)} files written to {output_dir}/")
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Scaffold project")
+    parser.add_argument("legacy_dir", nargs="?", help="Positional output dir (legacy)")
+    parser.add_argument("--repo-dir", help="Target repo directory")
+    parser.add_argument("--name", help="Project name (overrides PROJECT_NAME env)")
+    args = parser.parse_args()
+
+    project_name = args.name or load_env("PROJECT_NAME", "my-saas-app")
+    
+    if args.repo_dir:
+        output_dir = Path(args.repo_dir)
+    elif args.legacy_dir:
+        output_dir = Path(args.legacy_dir)
+    else:
+        output_dir = Path("output") / project_name.lower().replace(" ", "-")
+
+    scaffold(project_name, output_dir)
 
 
 if __name__ == "__main__":
-    scaffold()
+    main()
