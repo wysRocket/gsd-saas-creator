@@ -144,7 +144,7 @@ def generate_stitch_prompt(
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Generate stitch-prompt.md via Gemini")
-    parser.add_argument("--repo-dir", default="./output", help="Target repo directory")
+    parser.add_argument("--repo-dir", default="./output/default", help="Target repo directory")
     parser.add_argument("--brief", help="Explicit path to brief.md")
     parser.add_argument("--design-md", help="Explicit path to design.md")
     parser.add_argument("--design-language", help="Explicit path to design-language.md")

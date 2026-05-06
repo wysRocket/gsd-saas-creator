@@ -165,7 +165,7 @@ def main() -> None:
     parser.add_argument("--name", required=True, help="SaaS product name")
     parser.add_argument("--competitor-url", required=True, help="Competitor website URL")
     parser.add_argument("--vertical", default="Other", help="Business vertical")
-    parser.add_argument("--repo-dir", default="./output", help="Target repo directory")
+    parser.add_argument("--repo-dir", default="./output/default", help="Target repo directory")
     parser.add_argument("--design-language", help="Path to existing design-language.md")
     parser.add_argument("--force", action="store_true", help="Regenerate even if brief.md exists")
     args = parser.parse_args()

@@ -263,7 +263,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description="Generate Stitch-native DESIGN.md via Gemini"
     )
-    parser.add_argument("--repo-dir", default="./output", help="Target repo directory")
+    parser.add_argument("--repo-dir", default="./output/default", help="Target repo directory")
     parser.add_argument("--brief", help="Explicit path to brief.md")
     parser.add_argument(
         "--design-language",
