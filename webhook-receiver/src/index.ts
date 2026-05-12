@@ -1,9 +1,9 @@
 /**
  * saas-pipeline-webhook — Cloudflare Worker
  * ==========================================
- * Receives GitHub `projects_v2_item.edited` webhook events and
- * fires a `repository_dispatch` to gsd-saas-creator when the Stage
- * field changes to "Ready" (triggers full pipeline) or "Design.md" (legacy).
+ * Receives GitHub `projects_v2_item.edited` and `issue_comment.created`
+ * webhook events, verifies the GitHub HMAC signature, enriches the event from
+ * GitHub Projects v2, and fires a `repository_dispatch` to gsd-saas-creator.
  *
  * Deploy:
  *   cd webhook-receiver
@@ -18,7 +18,7 @@
  *   Payload URL:  https://saas-pipeline-webhook.<your-subdomain>.workers.dev/webhook
  *   Content type: application/json
  *   Secret:       <same as GITHUB_WEBHOOK_SECRET>
- *   Events:       Projects v2 item events  (or "Let me select" → projects_v2_item)
+ *   Events:       Projects v2 item events + Issue comments
  */
 
 export interface Env {
@@ -28,8 +28,42 @@ export interface Env {
   REPO_NAME: string;
 }
 
-// Stages that trigger the full SaaS creation pipeline
-const TRIGGER_STAGES = new Set(["Ready", "Design.md"]);
+const STAGE_FIELD_ID = "PVTSSF_lADOEHzfoM4BU-0MzhQD56k";
+const NOTES_FIELD_ID = "PVTF_lADOEHzfoM4BU-0MzhP_kGg";
+const REPO_URL_FIELD_ID = "PVTF_lADOEHzfoM4BU-0MzhQhuOI";
+const AI_STUDIO_FIELD_ID = "PVTF_lADOEHzfoM4BU-0MzhQtV7M";
+const VERTICAL_FIELD_ID = "PVTSSF_lADOEHzfoM4BU-0MzhQhuNE";
+const COMPETITOR_URL_FIELD_NAME = "Competitor URL";
+
+const STAGE_OPTION_TO_NAME: Record<string, string> = {
+  cddac2f5: "brief",
+  "0d90f5af": "clarification",
+  "67a099a3": "design_md",
+  e471f317: "stitch_prompt",
+  "5339ae55": "designs_ready",
+  cda08427: "ai_studio",
+  "58cac058": "in_progress",
+  e7d47d45: "revisions",
+  "5198760c": "ready_for_prod",
+  f01a3972: "launched",
+  "79fb3f03": "operating",
+  c15f4a82: "done",
+};
+
+const STAGE_LABEL_TO_NAME: Record<string, string> = {
+  Brief: "brief",
+  Clarification: "clarification",
+  "Design.md": "design_md",
+  "STITCH Prompt": "stitch_prompt",
+  "Designs Ready": "designs_ready",
+  "AI Studio": "ai_studio",
+  "In Progress": "in_progress",
+  Revisions: "revisions",
+  "Ready for Prod": "ready_for_prod",
+  Launched: "launched",
+  Operating: "operating",
+  Done: "done",
+};
 
 // ---------------------------------------------------------------------------
 // HMAC-SHA256 signature verification
@@ -63,48 +97,195 @@ async function verifySignature(
 }
 
 // ---------------------------------------------------------------------------
-// Parse field values from the projects_v2_item event
+// Event parsing
 // ---------------------------------------------------------------------------
 
 type FieldChange = {
   field_name?: string;
+  field_id?: string;
+  field_node_id?: string;
   field_type?: string;
-  to?: { name?: string; title?: string; date?: string; text?: string };
+  to?: {
+    id?: string;
+    name?: string;
+    optionId?: string;
+    option_id?: string;
+    single_select_option_id?: string;
+    title?: string;
+    date?: string;
+    text?: string;
+  };
 };
 
 function extractFieldChange(payload: any): FieldChange | null {
   return payload?.changes?.field_value ?? null;
 }
 
+function extractStageOptionId(change: FieldChange | null): string {
+  return (
+    change?.to?.id ??
+    change?.to?.optionId ??
+    change?.to?.option_id ??
+    change?.to?.single_select_option_id ??
+    ""
+  );
+}
+
+function isStageFieldChange(change: FieldChange | null): boolean {
+  if (!change) return false;
+  if (change.field_node_id) return change.field_node_id === STAGE_FIELD_ID;
+  if (change.field_id) return change.field_id === STAGE_FIELD_ID;
+  return change.field_name === "Stage";
+}
+
+function deriveRepoName(repoUrl: string, fallbackRepoName: string): string {
+  if (!repoUrl) return fallbackRepoName;
+
+  const cleaned = repoUrl
+    .trim()
+    .replace(/[?#].*$/, "")
+    .replace(/\/$/, "")
+    .replace(/\.git$/, "");
+
+  return cleaned.split("/").pop() || fallbackRepoName;
+}
+
 // ---------------------------------------------------------------------------
-// Fetch project item metadata via GitHub GraphQL (to get Competitor URL etc.)
+// Fetch project item metadata via GitHub GraphQL
 // ---------------------------------------------------------------------------
 
-async function fetchItemFields(
-  token: string,
-  projectId: string,
-  itemId: string
-): Promise<Record<string, string>> {
+type FieldValueNode = {
+  text?: string;
+  name?: string;
+  field?: {
+    id?: string;
+    name?: string;
+  };
+};
+
+type BoardItemFields = {
+  itemId: string;
+  issueNumber: number | null;
+  repositoryName: string;
+  title: string;
+  stage: string;
+  notes: string;
+  repoUrl: string;
+  aiStudio: string;
+  vertical: string;
+  competitorUrl: string;
+};
+
+async function githubGraphql(token: string, query: string, variables: Record<string, unknown>): Promise<any> {
+  const resp = await fetch("https://api.github.com/graphql", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+      "User-Agent": "saas-pipeline-webhook/1.0",
+    },
+    body: JSON.stringify({ query, variables }),
+  });
+
+  if (!resp.ok) {
+    throw new Error(`GitHub GraphQL request failed with ${resp.status}`);
+  }
+
+  const data: any = await resp.json();
+  if (data.errors?.length) {
+    throw new Error(`GitHub GraphQL errors: ${JSON.stringify(data.errors)}`);
+  }
+
+  return data;
+}
+
+async function fetchItemFields(token: string, itemId: string): Promise<BoardItemFields | null> {
   const query = `
-    query($projectId: ID!) {
-      node(id: $projectId) {
-        ... on ProjectV2 {
-          items(first: 100) {
+    query($itemId: ID!) {
+      node(id: $itemId) {
+        ... on ProjectV2Item {
+          id
+          content {
+            ... on Issue {
+              title
+              number
+              repository { name }
+            }
+            ... on PullRequest {
+              title
+              number
+              repository { name }
+            }
+            ... on DraftIssue {
+              title
+            }
+          }
+          fieldValues(first: 20) {
+            nodes {
+              ... on ProjectV2ItemFieldTextValue {
+                text
+                field { ... on ProjectV2FieldCommon { id name } }
+              }
+              ... on ProjectV2ItemFieldSingleSelectValue {
+                name
+                field { ... on ProjectV2FieldCommon { id name } }
+              }
+            }
+          }
+        }
+      }
+    }
+  `;
+
+  const data = await githubGraphql(token, query, { itemId });
+  const item = data?.data?.node;
+  if (!item?.id) return null;
+
+  const fields: BoardItemFields = {
+    itemId: item.id,
+    issueNumber: item.content?.number ?? null,
+    repositoryName: item.content?.repository?.name ?? "",
+    title: item.content?.title ?? "",
+    stage: "",
+    notes: "",
+    repoUrl: "",
+    aiStudio: "",
+    vertical: "",
+    competitorUrl: "",
+  };
+
+  for (const fv of item.fieldValues?.nodes ?? []) {
+    const node = fv as FieldValueNode;
+    const fieldId = node.field?.id ?? "";
+    const fieldName = node.field?.name ?? "";
+    const value = node.text ?? node.name ?? "";
+
+    if (fieldId === STAGE_FIELD_ID) fields.stage = value;
+    if (fieldId === NOTES_FIELD_ID) fields.notes = value;
+    if (fieldId === REPO_URL_FIELD_ID) fields.repoUrl = value;
+    if (fieldId === AI_STUDIO_FIELD_ID) fields.aiStudio = value;
+    if (fieldId === VERTICAL_FIELD_ID) fields.vertical = value;
+    if (fieldName === COMPETITOR_URL_FIELD_NAME) fields.competitorUrl = value;
+  }
+
+  return fields;
+}
+
+async function findProjectItemIdForIssue(token: string, issueNodeId: string): Promise<string> {
+  const query = `
+    query($issueId: ID!) {
+      node(id: $issueId) {
+        ... on Issue {
+          projectItems(first: 20) {
             nodes {
               id
-              fieldValues(first: 20) {
+              fieldValues(first: 10) {
                 nodes {
-                  ... on ProjectV2ItemFieldTextValue {
-                    text
-                    field { ... on ProjectV2Field { name } }
-                  }
                   ... on ProjectV2ItemFieldSingleSelectValue {
-                    name
-                    field { ... on ProjectV2SingleSelectField { name } }
+                    field { ... on ProjectV2FieldCommon { id name } }
                   }
-                  ... on ProjectV2ItemFieldNumberValue {
-                    number
-                    field { ... on ProjectV2Field { name } }
+                  ... on ProjectV2ItemFieldTextValue {
+                    field { ... on ProjectV2FieldCommon { id name } }
                   }
                 }
               }
@@ -115,41 +296,36 @@ async function fetchItemFields(
     }
   `;
 
-  const resp = await fetch("https://api.github.com/graphql", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-      "User-Agent": "saas-pipeline-webhook/1.0",
-    },
-    body: JSON.stringify({ query, variables: { projectId } }),
-  });
+  const data = await githubGraphql(token, query, { issueId: issueNodeId });
+  const items: any[] = data?.data?.node?.projectItems?.nodes ?? [];
+  const stageItem = items.find((item) =>
+    (item.fieldValues?.nodes ?? []).some((fv: FieldValueNode) => fv.field?.id === STAGE_FIELD_ID)
+  );
 
-  if (!resp.ok) return {};
-
-  const data: any = await resp.json();
-  const items: any[] = data?.data?.node?.items?.nodes ?? [];
-  const item = items.find((n: any) => n.id === itemId);
-  if (!item) return {};
-
-  const fields: Record<string, string> = {};
-  for (const fv of item.fieldValues?.nodes ?? []) {
-    const name: string = fv.field?.name ?? "";
-    const value: string = fv.text ?? fv.name ?? String(fv.number ?? "");
-    if (name && value) fields[name] = value;
-  }
-  return fields;
+  return stageItem?.id ?? items[0]?.id ?? "";
 }
 
 // ---------------------------------------------------------------------------
 // Fire repository_dispatch to gsd-saas-creator
 // ---------------------------------------------------------------------------
 
+type StageDispatchPayload = {
+  stage: string;
+  item_id: string;
+  issue_number: number;
+  repo_name: string;
+  project_name: string;
+  competitor_url: string;
+  vertical: string;
+  notes: string;
+  comment_body: string;
+};
+
 async function dispatchStageChange(
   token: string,
   owner: string,
   repo: string,
-  payload: Record<string, unknown>
+  payload: StageDispatchPayload
 ): Promise<boolean> {
   const url = `https://api.github.com/repos/${owner}/${repo}/dispatches`;
   const resp = await fetch(url, {
@@ -168,6 +344,28 @@ async function dispatchStageChange(
   return resp.status === 204;
 }
 
+function buildDispatchPayload(
+  stage: string,
+  item: BoardItemFields,
+  eventRepoName: string,
+  fallbackIssueNumber: number | null,
+  commentBody: string
+): StageDispatchPayload {
+  const repoName = deriveRepoName(item.repoUrl, item.repositoryName || eventRepoName);
+
+  return {
+    stage,
+    item_id: item.itemId,
+    issue_number: item.issueNumber ?? fallbackIssueNumber ?? 0,
+    repo_name: repoName,
+    project_name: item.title || repoName,
+    competitor_url: item.competitorUrl,
+    vertical: item.vertical,
+    notes: item.notes,
+    comment_body: commentBody,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Main handler
 // ---------------------------------------------------------------------------
@@ -178,7 +376,7 @@ export default {
 
     // Health check
     if (url.pathname === "/" || url.pathname === "/health") {
-      return new Response(JSON.stringify({ status: "ok", trigger_stages: [...TRIGGER_STAGES] }), {
+      return new Response(JSON.stringify({ status: "ok", stages: STAGE_OPTION_TO_NAME }), {
         headers: { "Content-Type": "application/json" },
       });
     }
@@ -203,11 +401,6 @@ export default {
       }
     }
 
-    // Only handle projects_v2_item.edited
-    if (event !== "projects_v2_item") {
-      return new Response("Ignored", { status: 200 });
-    }
-
     let payload: any;
     try {
       payload = JSON.parse(body);
@@ -215,71 +408,89 @@ export default {
       return new Response("Bad Request", { status: 400 });
     }
 
-    if (payload.action !== "edited") {
-      return new Response("Ignored (action)", { status: 200 });
+    let stage = "";
+    let itemId = "";
+    let commentBody = "";
+    let fallbackIssueNumber: number | null = null;
+    const eventRepoName: string = payload?.repository?.name ?? "";
+
+    if (event === "projects_v2_item") {
+      if (payload.action !== "edited") {
+        return new Response("Ignored (action)", { status: 200 });
+      }
+
+      const change = extractFieldChange(payload);
+      if (!isStageFieldChange(change)) {
+        return new Response("Ignored (field)", { status: 200 });
+      }
+
+      const optionId = extractStageOptionId(change);
+      stage = STAGE_OPTION_TO_NAME[optionId] ?? STAGE_LABEL_TO_NAME[change?.to?.name ?? ""] ?? "";
+      if (!stage) {
+        return new Response(`Ignored (stage_option_id=${optionId})`, { status: 200 });
+      }
+
+      itemId = payload?.projects_v2_item?.node_id ?? "";
+    } else if (event === "issue_comment") {
+      if (payload.action !== "created") {
+        return new Response("Ignored (action)", { status: 200 });
+      }
+
+      stage = "revisions";
+      commentBody = payload?.comment?.body ?? "";
+      fallbackIssueNumber = payload?.issue?.number ?? null;
+
+      const issueNodeId: string = payload?.issue?.node_id ?? "";
+      if (!issueNodeId) {
+        return new Response("Ignored (missing issue node id)", { status: 200 });
+      }
+
+      itemId = await findProjectItemIdForIssue(env.GH_TOKEN, issueNodeId);
+    } else {
+      return new Response("Ignored", { status: 200 });
     }
 
-    const change = extractFieldChange(payload);
-    const newStage: string = change?.to?.name ?? "";
-
-    // Trigger on "Ready" (full pipeline) or "Design.md" (legacy partial trigger)
-    if (!TRIGGER_STAGES.has(newStage)) {
-      return new Response(`Ignored (stage=${newStage})`, { status: 200 });
+    if (!itemId) {
+      return new Response("Ignored (missing item id)", { status: 200 });
     }
 
-    const projectId: string = payload?.project_v2?.node_id ?? "";
-    const itemId: string = payload?.projects_v2_item?.node_id ?? "";
-
-    // Fetch all field values for this item
-    const fields = await fetchItemFields(env.GH_TOKEN, projectId, itemId);
-
-    const competitorUrl: string = fields["Competitor URL"] ?? "";
-    const repoUrl: string = fields["Repo URL"] ?? "";
-    const vertical: string = fields["Vertical"] ?? "";
-    const priority: string = fields["Priority"] ?? "5";
-    const stitchProjectId: string = fields["Stitch Project ID"] ?? "";
-
-    // Derive repo name from Repo URL or item title
-    const repoName: string =
-      repoUrl
-        ? repoUrl.replace(/\/$/, "").split("/").pop() ?? ""
-        : fields["Title"] ?? "untitled-saas";
-
-    const projectName: string = fields["Title"] ?? repoName;
-
-    if (!competitorUrl) {
-      return new Response(
-        JSON.stringify({ message: "Competitor URL not set — skipping pipeline trigger" }),
-        { headers: { "Content-Type": "application/json" }, status: 200 }
-      );
+    let item: BoardItemFields | null;
+    try {
+      item = await fetchItemFields(env.GH_TOKEN, itemId);
+    } catch (error) {
+      console.error("[pipeline] failed to fetch item fields", error);
+      return new Response("Failed to fetch item fields", { status: 500 });
     }
 
-    // Fire dispatch
+    if (!item) {
+      return new Response("Ignored (item not found)", { status: 200 });
+    }
+
+    const dispatchPayload = buildDispatchPayload(
+      stage,
+      item,
+      eventRepoName,
+      fallbackIssueNumber,
+      commentBody
+    );
+
     const dispatched = await dispatchStageChange(
       env.GH_TOKEN,
       env.REPO_OWNER,
       env.REPO_NAME,
-      {
-        item_id: itemId,
-        project_id: projectId,
-        new_stage: newStage,
-        competitor_url: competitorUrl,
-        repo_name: repoName,
-        project_name: projectName,
-        vertical,
-        priority,
-        stitch_project_id: stitchProjectId,
-      }
+      dispatchPayload
     );
 
     if (dispatched) {
-      console.log(`[pipeline] dispatched stage_changed for ${projectName} (${repoName}) stage=${newStage}`);
+      console.log(
+        `[pipeline] dispatched stage_changed for ${dispatchPayload.project_name} (${dispatchPayload.repo_name}) stage=${stage}`
+      );
       return new Response(
-        JSON.stringify({ message: "Pipeline triggered", repo: repoName, stage: newStage }),
+        JSON.stringify({ message: "Stage dispatched", repo: dispatchPayload.repo_name, stage }),
         { headers: { "Content-Type": "application/json" }, status: 200 }
       );
-    } else {
-      return new Response("Dispatch failed", { status: 500 });
     }
+
+    return new Response("Dispatch failed", { status: 500 });
   },
 };

@@ -1,0 +1,129 @@
+name: Stage Orchestrator
+
+on:
+  repository_dispatch:
+    types: [stage_changed]
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: stage-orchestrator-${{ github.event.client_payload.item_id || github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  orchestrate:
+    name: Route board stage
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    env:
+      STAGE: ${{ github.event.client_payload.stage }}
+      ITEM_ID: ${{ github.event.client_payload.item_id }}
+      ISSUE_NUMBER: ${{ github.event.client_payload.issue_number }}
+      REPO_NAME: ${{ github.event.client_payload.repo_name }}
+      PROJECT_NAME: ${{ github.event.client_payload.project_name }}
+      COMPETITOR_URL: ${{ github.event.client_payload.competitor_url }}
+      VERTICAL: ${{ github.event.client_payload.vertical }}
+      NOTES: ${{ github.event.client_payload.notes }}
+      COMMENT_BODY: ${{ github.event.client_payload.comment_body }}
+
+    steps:
+      - name: Checkout gsd-saas-creator
+        uses: actions/checkout@v4
+
+      - name: Validate dispatch payload
+        shell: bash
+        run: |
+          case "$STAGE" in
+            brief|clarification|design_md|stitch_prompt|designs_ready|ai_studio|in_progress|revisions|ready_for_prod|launched|operating|done)
+              ;;
+            *)
+              echo "Unsupported stage: $STAGE" >&2
+              exit 1
+              ;;
+          esac
+
+          test -n "$ITEM_ID" || { echo "Missing item_id" >&2; exit 1; }
+          test -n "$REPO_NAME" || { echo "Missing repo_name" >&2; exit 1; }
+          test -n "$PROJECT_NAME" || { echo "Missing project_name" >&2; exit 1; }
+
+      - name: Route stage
+        shell: bash
+        run: |
+          case "$STAGE" in
+            brief)
+              OWNER="@pm"
+              NEXT_ACTION="Prepare or refresh requirements brief."
+              ;;
+            clarification)
+              OWNER="@pm"
+              NEXT_ACTION="Collect missing user decisions before generation continues."
+              ;;
+            design_md)
+              OWNER="@engineer"
+              NEXT_ACTION="Generate design.md from design language artifacts."
+              ;;
+            stitch_prompt)
+              OWNER="@engineer"
+              NEXT_ACTION="Generate stitch-prompt.md from validated design.md."
+              ;;
+            designs_ready)
+              OWNER="@engineer"
+              NEXT_ACTION="Confirm generated design assets are ready for implementation."
+              ;;
+            ai_studio)
+              OWNER="@engineer"
+              NEXT_ACTION="Coordinate AI Studio implementation handoff."
+              ;;
+            in_progress)
+              OWNER="@engineer"
+              NEXT_ACTION="Track active implementation."
+              ;;
+            revisions)
+              OWNER="@qa"
+              NEXT_ACTION="Route feedback and requested revisions."
+              ;;
+            ready_for_prod)
+              OWNER="@qa"
+              NEXT_ACTION="Run production-readiness validation."
+              ;;
+            launched)
+              OWNER="@devops"
+              NEXT_ACTION="Confirm deployment and launch state."
+              ;;
+            operating)
+              OWNER="@devops"
+              NEXT_ACTION="Monitor live operations."
+              ;;
+            done)
+              OWNER="@devops"
+              NEXT_ACTION="Close out completed delivery."
+              ;;
+          esac
+
+          {
+            echo "## Stage Dispatch"
+            echo ""
+            echo "- Stage: $STAGE"
+            echo "- Owner: $OWNER"
+            echo "- Project: $PROJECT_NAME"
+            echo "- Repo: $REPO_NAME"
+            echo "- Item: $ITEM_ID"
+            echo "- Issue: $ISSUE_NUMBER"
+            echo "- Vertical: $VERTICAL"
+            echo "- Competitor URL: $COMPETITOR_URL"
+            echo "- Next action: $NEXT_ACTION"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Record revision comment
+        if: ${{ github.event.client_payload.stage == 'revisions' && github.event.client_payload.comment_body != '' }}
+        shell: bash
+        run: |
+          {
+            echo ""
+            echo "## Revision Comment"
+            echo ""
+            printf '%s\n' "$COMMENT_BODY"
+          } >> "$GITHUB_STEP_SUMMARY"
