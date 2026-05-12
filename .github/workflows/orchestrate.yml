@@ -101,6 +101,10 @@ jobs:
               OWNER="@devops"
               NEXT_ACTION="Close out completed delivery."
               ;;
+            *)
+              echo "Unhandled stage: $STAGE" >&2
+              exit 1
+              ;;
           esac
 
           {
@@ -115,6 +119,17 @@ jobs:
             echo "- Vertical: $VERTICAL"
             echo "- Competitor URL: $COMPETITOR_URL"
             echo "- Next action: $NEXT_ACTION"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Record revision comment
+        if: ${{ github.event.client_payload.stage == 'revisions' && github.event.client_payload.comment_body != '' }}
+        shell: bash
+        run: |
+          {
+            echo ""
+            echo "## Revision Comment"
+            echo ""
+            printf '%s\n' "$COMMENT_BODY"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Set up Python 3.11
