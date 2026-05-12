@@ -260,11 +260,11 @@ async function fetchItemFields(token: string, itemId: string): Promise<BoardItem
     const fieldName = node.field?.name ?? "";
     const value = node.text ?? node.name ?? "";
 
-    if (fieldId === STAGE_FIELD_ID) fields.stage = value;
-    if (fieldId === NOTES_FIELD_ID) fields.notes = value;
-    if (fieldId === REPO_URL_FIELD_ID) fields.repoUrl = value;
-    if (fieldId === AI_STUDIO_FIELD_ID) fields.aiStudio = value;
-    if (fieldId === VERTICAL_FIELD_ID) fields.vertical = value;
+    if (fieldId === STAGE_FIELD_ID || fieldName === "Stage") fields.stage = value;
+    if (fieldId === NOTES_FIELD_ID || fieldName === "Notes") fields.notes = value;
+    if (fieldId === REPO_URL_FIELD_ID || fieldName === "Repo URL") fields.repoUrl = value;
+    if (fieldId === AI_STUDIO_FIELD_ID || fieldName === "AI Studio") fields.aiStudio = value;
+    if (fieldId === VERTICAL_FIELD_ID || fieldName === "Vertical") fields.vertical = value;
     if (fieldName === COMPETITOR_URL_FIELD_NAME) fields.competitorUrl = value;
   }
 
@@ -279,7 +279,7 @@ async function findProjectItemIdForIssue(token: string, issueNodeId: string): Pr
           projectItems(first: 20) {
             nodes {
               id
-              fieldValues(first: 10) {
+              fieldValues(first: 20) {
                 nodes {
                   ... on ProjectV2ItemFieldSingleSelectValue {
                     field { ... on ProjectV2FieldCommon { id name } }
@@ -299,7 +299,7 @@ async function findProjectItemIdForIssue(token: string, issueNodeId: string): Pr
   const data = await githubGraphql(token, query, { issueId: issueNodeId });
   const items: any[] = data?.data?.node?.projectItems?.nodes ?? [];
   const stageItem = items.find((item) =>
-    (item.fieldValues?.nodes ?? []).some((fv: FieldValueNode) => fv.field?.id === STAGE_FIELD_ID)
+    (item.fieldValues?.nodes ?? []).some((fv: FieldValueNode) => fv.field?.id === STAGE_FIELD_ID || fv.field?.name === "Stage")
   );
 
   return stageItem?.id ?? items[0]?.id ?? "";
@@ -433,7 +433,7 @@ function buildDispatchPayload(
   fallbackIssueNumber: number | null,
   commentBody: string
 ): StageDispatchPayload {
-  const repoName = deriveRepoName(item.repoUrl, item.repositoryName || eventRepoName);
+  const repoName = deriveRepoName(item.repoUrl, item.repositoryName || eventRepoName || item.title || "untitled-saas");
 
   return {
     stage,
@@ -537,7 +537,12 @@ export default {
         return new Response("Ignored (missing issue node id)", { status: 200 });
       }
 
-      itemId = await findProjectItemIdForIssue(env.GH_TOKEN, issueNodeId);
+      try {
+        itemId = await findProjectItemIdForIssue(env.GH_TOKEN, issueNodeId);
+      } catch (error) {
+        console.error("[pipeline] failed to find project item for issue", error);
+        return new Response("Failed to find project item", { status: 500 });
+      }
     } else {
       return new Response("Ignored", { status: 200 });
     }

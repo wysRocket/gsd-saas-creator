@@ -101,6 +101,10 @@ jobs:
               OWNER="@devops"
               NEXT_ACTION="Close out completed delivery."
               ;;
+            *)
+              echo "Unhandled stage: $STAGE" >&2
+              exit 1
+              ;;
           esac
 
           {
