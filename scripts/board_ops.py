@@ -1,5 +1,4 @@
 import requests
-import json
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -73,11 +72,15 @@ def update_stage(item_id, stage_key, token):
         "fieldId": STAGE_FIELD_ID,
         "optionId": option_id
     }
-    headers = {"Authorization": f"token {token}"}
+    headers = {"Authorization": f"Bearer {token}"}
     try:
         response = requests.post(GITHUB_GRAPHQL_URL, headers=headers, json={"query": mutation, "variables": variables})
         response.raise_for_status()
-        return response.json()
+        result = response.json()
+        if "errors" in result:
+            print(f"[warning] GraphQL errors in update_stage: {result['errors']}")
+            return None
+        return result
     except Exception as e:
         print(f"[warning] Failed to update stage: {e}")
         return None
@@ -102,11 +105,15 @@ def update_text_field(item_id, field_id, value, token):
         "fieldId": field_id,
         "value": value
     }
-    headers = {"Authorization": f"token {token}"}
+    headers = {"Authorization": f"Bearer {token}"}
     try:
         response = requests.post(GITHUB_GRAPHQL_URL, headers=headers, json={"query": mutation, "variables": variables})
         response.raise_for_status()
-        return response.json()
+        result = response.json()
+        if "errors" in result:
+            print(f"[warning] GraphQL errors in update_text_field: {result['errors']}")
+            return None
+        return result
     except Exception as e:
         print(f"[warning] Failed to update text field {field_id}: {e}")
         return None
@@ -117,7 +124,7 @@ def get_item_fields(item_id, token):
     query($itemId: ID!) {
       node(id: $itemId) {
         ... on ProjectV2Item {
-          fieldValues(first: 20) {
+          fieldValues(first: 100) {
             nodes {
               ... on ProjectV2ItemFieldTextValue {
                 text
@@ -134,16 +141,22 @@ def get_item_fields(item_id, token):
     }
     """
     variables = {"itemId": item_id}
-    headers = {"Authorization": f"token {token}"}
+    headers = {"Authorization": f"Bearer {token}"}
     try:
         response = requests.post(GITHUB_GRAPHQL_URL, headers=headers, json={"query": query, "variables": variables})
         response.raise_for_status()
         data = response.json()
+        if "errors" in data:
+            print(f"[warning] GraphQL errors in get_item_fields: {data['errors']}")
+            return {}
         nodes = data.get("data", {}).get("node", {}).get("fieldValues", {}).get("nodes", [])
         
         flat = {}
         for node in nodes:
-            field_name = node.get("field", {}).get("name")
+            field = node.get("field", {})
+            field_name = field.get("name")
+            if not field_name:
+                continue
             if "text" in node:
                 flat[field_name] = node["text"]
             elif "name" in node:
