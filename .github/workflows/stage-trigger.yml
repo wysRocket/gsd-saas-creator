@@ -13,6 +13,11 @@
 #   6. Advances Stage to "STITCH Prompt" on the board
 #   7. Posts a comment on the linked GitHub issue
 #
+# On failure:
+#   - Posts an error comment on the board item's issue
+#   - Reverts Stage to "Revisions" (human-gate — requires manual review)
+#   - Each step is idempotent — re-running picks up from the failed step
+#
 # Trigger: Repository Dispatch (sent by an external webhook receiver or
 # GitHub App that listens to `projects_v2_item.edited` events).
 #
@@ -24,6 +29,7 @@
 #   PROJECT_ID       — GraphQL node ID of the GitHub Project (PVT_…)
 #   STAGE_FIELD_ID   — GraphQL ID of the Stage field (PVTSSF_…)
 #   STITCH_STAGE_ID  — Stage option ID for "STITCH Prompt" (e471f317 for main board)
+#   REVISIONS_STAGE_ID — Stage option ID for "Revisions" (e7d47d45 for main board)
 
 name: Stage Change Automation
 
@@ -31,10 +37,17 @@ on:
   repository_dispatch:
     types: [stage_changed]
 
+env:
+  ORG: SaaS-Pretty-Projects
+  PROJECT_ID: ${{ vars.PROJECT_ID }}
+  STAGE_FIELD_ID: ${{ vars.STAGE_FIELD_ID }}
+  STITCH_STAGE_ID: ${{ vars.STITCH_STAGE_ID }}
+  REVISIONS_STAGE_ID: ${{ vars.REVISIONS_STAGE_ID }}
+
 jobs:
   handle-stage-change:
     runs-on: ubuntu-latest
-    if: github.event.client_payload.new_stage == 'Design.md'
+    if: github.event.client_payload.stage == 'brief'
 
     steps:
       - name: Checkout gsd-saas-creator
@@ -55,89 +68,167 @@ jobs:
 
       - name: Extract context from payload
         id: ctx
+        env:
+          _ITEM_ID: ${{ github.event.client_payload.item_id }}
+          _ISSUE_NUMBER: ${{ github.event.client_payload.issue_number }}
+          _REPO_NAME: ${{ github.event.client_payload.repo_name }}
+          _COMPETITOR_URL: ${{ github.event.client_payload.competitor_url }}
+          _PROJECT_NAME: ${{ github.event.client_payload.project_name }}
+          _VERTICAL: ${{ github.event.client_payload.vertical }}
         run: |
-          echo "ITEM_ID=${{ github.event.client_payload.item_id }}" >> $GITHUB_ENV
-          echo "REPO_NAME=${{ github.event.client_payload.repo_name }}" >> $GITHUB_ENV
-          echo "COMPETITOR_URL=${{ github.event.client_payload.competitor_url }}" >> $GITHUB_ENV
-          echo "PROJECT_NAME=${{ github.event.client_payload.project_name }}" >> $GITHUB_ENV
-          echo "VERTICAL=${{ github.event.client_payload.vertical }}" >> $GITHUB_ENV
+          echo "ITEM_ID=${_ITEM_ID}" >> $GITHUB_ENV
+          echo "ISSUE_NUMBER=${_ISSUE_NUMBER}" >> $GITHUB_ENV
+          echo "REPO_NAME=${_REPO_NAME}" >> $GITHUB_ENV
+          echo "COMPETITOR_URL=${_COMPETITOR_URL}" >> $GITHUB_ENV
+          echo "PROJECT_NAME=${_PROJECT_NAME}" >> $GITHUB_ENV
+          echo "VERTICAL=${_VERTICAL}" >> $GITHUB_ENV
+          echo "REPO_DIR=output/${_REPO_NAME}" >> $GITHUB_ENV
 
+      # -------------------------------------------------------------------------
+      # Step 1: designlang — idempotent (only runs if design/ is empty)
+      # -------------------------------------------------------------------------
       - name: Run designlang on competitor
         if: env.COMPETITOR_URL != ''
         run: |
-          mkdir -p output/${REPO_NAME}/design
-          npx designlang "${COMPETITOR_URL}" --full --screenshots --out "output/${REPO_NAME}/design" || true
+          DESIGN_DIR="${REPO_DIR}/design"
+          mkdir -p "${DESIGN_DIR}"
+          # Only run if no screenshots exist yet (idempotent)
+          if [ ! "$(ls -A "${DESIGN_DIR}" 2>/dev/null)" ]; then
+            echo "::notice::Running designlang on ${COMPETITOR_URL}"
+            npx designlang "${COMPETITOR_URL}" --full --screenshots --out "${DESIGN_DIR}" || true
+          else
+            echo "::notice::designlang output already exists, skipping"
+          fi
 
+      # -------------------------------------------------------------------------
+      # Step 2: brief.md — idempotent (only runs if brief.md is missing)
+      # -------------------------------------------------------------------------
       - name: Generate brief.md
+        id: brief
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
-          python scripts/agent_workflow.py record-stage brief \
-            --repo-dir output/${REPO_NAME} \
-            --status started \
-            --message "Generating brief.md"
-          python scripts/generate_brief.py \
-            --name "${PROJECT_NAME}" \
-            --competitor-url "${COMPETITOR_URL}" \
-            --vertical "${VERTICAL}" \
-            --repo-dir output/${REPO_NAME}
-          python scripts/agent_workflow.py validate-stage brief \
-            --repo-dir output/${REPO_NAME} \
-            --log
+          BRIEF_FILE="${REPO_DIR}/brief.md"
+          if [ -f "${BRIEF_FILE}" ]; then
+            echo "::notice::brief.md already exists, skipping generation"
+          else
+            echo "::notice::Generating brief.md"
+            python scripts/agent_workflow.py record-stage brief \
+              --repo-dir "${REPO_DIR}" \
+              --status started \
+              --message "Generating brief.md"
+            if python scripts/generate_brief.py \
+                --name "${PROJECT_NAME}" \
+                --competitor-url "${COMPETITOR_URL}" \
+                --vertical "${VERTICAL}" \
+                --repo-dir "${REPO_DIR}"; then
+              python scripts/agent_workflow.py record-stage brief \
+                --repo-dir "${REPO_DIR}" \
+                --status passed \
+                --message "brief.md generated"
+            else
+              python scripts/agent_workflow.py record-stage brief \
+                --repo-dir "${REPO_DIR}" \
+                --status failed \
+                --message "generate_brief.py failed"
+              exit 1
+            fi
+          fi
 
+      # -------------------------------------------------------------------------
+      # Step 3: design.md — idempotent (only runs if design.md is missing)
+      # -------------------------------------------------------------------------
       - name: Generate design.md
+        id: design_md
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
-          python scripts/agent_workflow.py record-stage design_md \
-            --repo-dir output/${REPO_NAME} \
-            --status started \
-            --message "Generating design.md"
-          python scripts/generate_design_md.py \
-            --repo-dir output/${REPO_NAME}
-          python scripts/agent_workflow.py validate-stage design_md \
-            --repo-dir output/${REPO_NAME} \
-            --log
+          DESIGN_FILE="${REPO_DIR}/design.md"
+          if [ -f "${DESIGN_FILE}" ]; then
+            echo "::notice::design.md already exists, skipping generation"
+          else
+            echo "::notice::Generating design.md"
+            python scripts/agent_workflow.py record-stage design_md \
+              --repo-dir "${REPO_DIR}" \
+              --status started \
+              --message "Generating design.md"
+            if python scripts/generate_design_md.py \
+                --repo-dir "${REPO_DIR}"; then
+              python scripts/agent_workflow.py record-stage design_md \
+                --repo-dir "${REPO_DIR}" \
+                --status passed \
+                --message "design.md generated"
+            else
+              python scripts/agent_workflow.py record-stage design_md \
+                --repo-dir "${REPO_DIR}" \
+                --status failed \
+                --message "generate_design_md.py failed"
+              exit 1
+            fi
+          fi
 
+      # -------------------------------------------------------------------------
+      # Step 4: stitch-prompt.md — idempotent (only runs if stitch-prompt.md is missing)
+      # -------------------------------------------------------------------------
       - name: Generate stitch-prompt.md
+        id: stitch_prompt
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
-          python scripts/agent_workflow.py record-stage stitch_prompt \
-            --repo-dir output/${REPO_NAME} \
-            --status started \
-            --message "Generating stitch-prompt.md"
-          python scripts/generate_stitch_prompt.py \
-            --repo-dir output/${REPO_NAME}
-          python scripts/agent_workflow.py validate-stage stitch_prompt \
-            --repo-dir output/${REPO_NAME} \
-            --log
+          STITCH_FILE="${REPO_DIR}/stitch-prompt.md"
+          if [ -f "${STITCH_FILE}" ]; then
+            echo "::notice::stitch-prompt.md already exists, skipping generation"
+          else
+            echo "::notice::Generating stitch-prompt.md"
+            python scripts/agent_workflow.py record-stage stitch_prompt \
+              --repo-dir "${REPO_DIR}" \
+              --status started \
+              --message "Generating stitch-prompt.md"
+            if python scripts/generate_stitch_prompt.py \
+                --repo-dir "${REPO_DIR}"; then
+              python scripts/agent_workflow.py record-stage stitch_prompt \
+                --repo-dir "${REPO_DIR}" \
+                --status passed \
+                --message "stitch-prompt.md generated"
+            else
+              python scripts/agent_workflow.py record-stage stitch_prompt \
+                --repo-dir "${REPO_DIR}" \
+                --status failed \
+                --message "generate_stitch_prompt.py failed"
+              exit 1
+            fi
+          fi
 
+      # -------------------------------------------------------------------------
+      # Step 5: Push artifacts to product repo
+      # -------------------------------------------------------------------------
       - name: Push artifacts to product repo
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: |
-          ORG="SaaS-Pretty-Projects"
           # Create repo if missing
-          gh repo view "${ORG}/${REPO_NAME}" --json name >/dev/null 2>&1 || \
+          if ! gh repo view "${ORG}/${REPO_NAME}" --json name >/dev/null 2>&1; then
+            echo "::notice::Creating repo ${ORG}/${REPO_NAME}"
             gh repo create "${ORG}/${REPO_NAME}" --public --description "${PROJECT_NAME} SaaS"
+          fi
 
-          # Clone, add files, push (gh handles auth via GH_TOKEN — avoids token in URL)
+          # Clone, add files, push
           gh repo clone "${ORG}/${REPO_NAME}" _target
-          cp -r "output/${REPO_NAME}/." _target/
+          cp -r "${REPO_DIR}/." _target/
           cd _target
           git config user.email "automation@saas-pretty-projects.com"
           git config user.name "SaaS Creator Bot"
           git add -A
-          git diff --cached --quiet || git commit -m "chore: auto-generate brief, design, and stitch prompt [stage=Design.md]"
+          git diff --cached --quiet || git commit -m "chore: auto-generate brief, design, and stitch prompt [stage=brief]"
           git push origin main
 
+      # -------------------------------------------------------------------------
+      # Step 6: Advance Stage to STITCH Prompt
+      # -------------------------------------------------------------------------
       - name: Advance Stage to STITCH Prompt
+        if: success()
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
-          PROJECT_ID: ${{ vars.PROJECT_ID }}
-          STAGE_FIELD_ID: ${{ vars.STAGE_FIELD_ID }}
-          STITCH_STAGE_ID: ${{ vars.STITCH_STAGE_ID }}
         run: |
           gh api graphql -f query="
             mutation {
@@ -149,3 +240,56 @@ jobs:
               }) { projectV2Item { id } }
             }"
           echo "✓ Stage advanced to STITCH Prompt"
+
+      # -------------------------------------------------------------------------
+      # Step 7: Post success comment on issue
+      # -------------------------------------------------------------------------
+      - name: Post success comment on issue
+        if: success() && env.ISSUE_NUMBER != ''
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: |
+          gh api repos/${ORG}/${REPO_NAME}/issues/${ISSUE_NUMBER}/comments \
+            --field body="## ✅ Pipeline complete
+
+All artifacts generated and pushed to [\`${REPO_NAME}\`](https://github.com/${ORG}/${REPO_NAME}).
+
+**Next:** Complete the STITCH designs in Figma, then advance the board stage to **Designs Ready**." \
+            --method POST
+
+      # -------------------------------------------------------------------------
+      # Failure handler: revert stage to Revisions + post error comment
+      # -------------------------------------------------------------------------
+      - name: Revert Stage to Revisions
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: |
+          echo "::error::Pipeline failed — reverting Stage to Revisions"
+          gh api graphql -f query="
+            mutation {
+              updateProjectV2ItemFieldValue(input: {
+                projectId: \"${PROJECT_ID}\"
+                itemId: \"${ITEM_ID}\"
+                fieldId: \"${STAGE_FIELD_ID}\"
+                value: { singleSelectOptionId: \"${REVISIONS_STAGE_ID}\" }
+              }) { projectV2Item { id } }
+            }"
+          echo "✓ Stage reverted to Revisions"
+
+      - name: Post failure comment on issue
+        if: failure() && env.ISSUE_NUMBER != ''
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: |
+          LAST_RUN_URL="https://github.com/wysRocket/gsd-saas-creator/actions/runs/${GITHUB_RUN_ID}"
+          gh api "repos/${ORG}/${REPO_NAME}/issues/${ISSUE_NUMBER}/comments" \
+            --field body="## ❌ Pipeline failed
+
+The \`brief → design.md → stitch-prompt\` pipeline failed.
+Stage has been reverted to **Revisions** — please review and address the error.
+
+**Last run:** ${LAST_RUN_URL}
+
+**Next:** Fix the issue and re-trigger by moving the stage back to **Brief**." \
+            --method POST

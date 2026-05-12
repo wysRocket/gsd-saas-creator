@@ -5,7 +5,7 @@ on:
     types: [stage_changed]
 
 permissions:
-  contents: read
+  contents: write
   issues: write
 
 concurrency:
@@ -127,3 +127,35 @@ jobs:
             echo ""
             printf '%s\n' "$COMMENT_BODY"
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Python dependencies
+        run: pip install --quiet google-genai requests
+
+      - name: Install designlang (best-effort)
+        run: npm install -g designlang || true
+
+      - name: Run orchestrator
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          python scripts/orchestrate.py \
+            --stage "$STAGE" \
+            --item-id "$ITEM_ID" \
+            --issue-number "$ISSUE_NUMBER" \
+            --repo-name "$REPO_NAME" \
+            --project-name "$PROJECT_NAME" \
+            --competitor-url "$COMPETITOR_URL" \
+            --vertical "$VERTICAL" \
+            --notes "$NOTES" \
+            --comment-body "$COMMENT_BODY"

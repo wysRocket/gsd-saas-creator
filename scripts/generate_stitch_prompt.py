@@ -144,16 +144,26 @@ def generate_stitch_prompt(
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Generate stitch-prompt.md via Gemini")
-    parser.add_argument("--repo-dir", default="./output", help="Target repo directory")
+    parser.add_argument("--repo-dir", default="./output/default", help="Target repo directory")
     parser.add_argument("--brief", help="Explicit path to brief.md")
     parser.add_argument("--design-md", help="Explicit path to design.md")
     parser.add_argument("--design-language", help="Explicit path to design-language.md")
+    parser.add_argument("--force", action="store_true", help="Regenerate even if stitch-prompt.md exists")
     args = parser.parse_args()
 
     repo_dir = Path(args.repo_dir)
     brief_path = Path(args.brief) if args.brief else repo_dir / "brief.md"
     design_path = Path(args.design_md) if args.design_md else repo_dir / "design.md"
     dl_path = _resolve_design_language(repo_dir, args.design_language)
+
+    out_path = repo_dir / "stitch-prompt.md"
+
+    # Idempotent: skip if already generated (unless --force)
+    if out_path.exists() and not args.force:
+        existing = out_path.read_text().strip()
+        if existing:
+            print(f"  → stitch-prompt.md already exists ({len(existing):,} chars), skipping. Use --force to regenerate.")
+            return
 
     brief_md = _load(brief_path, "brief.md")
     design_md = _load(design_path, "design.md")
@@ -168,7 +178,6 @@ def main() -> None:
     print(f"  → generating stitch-prompt.md via Gemini ({GEMINI_MODEL}) …")
     stitch_md = generate_stitch_prompt(brief_md, design_md, design_language_md, template)
 
-    out_path = repo_dir / "stitch-prompt.md"
     out_path.write_text(stitch_md)
     print(f"\n✓ stitch-prompt.md written to {out_path} ({len(stitch_md):,} chars)")
 

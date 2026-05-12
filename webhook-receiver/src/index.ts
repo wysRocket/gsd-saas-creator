@@ -306,6 +306,74 @@ async function findProjectItemIdForIssue(token: string, issueNodeId: string): Pr
 }
 
 // ---------------------------------------------------------------------------
+// Retry helper (exponential backoff)
+// ---------------------------------------------------------------------------
+
+const DEFAULT_MAX_ATTEMPTS = 3;
+const DEFAULT_BASE_DELAY_MS = 1000;
+
+async function sleep(ms: number): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Retry a Promise-returning function with exponential backoff.
+ * Retries on network errors and HTTP 5xx responses.
+ * Returns the result of the first successful attempt, or throws the last error.
+ */
+async function withRetry<T>(
+  fn: () => Promise<T>,
+  options: {
+    maxAttempts?: number;
+    baseDelayMs?: number;
+    label?: string;
+    isRetriable?: (resp: Response) => boolean;
+  } = {}
+): Promise<T> {
+  const {
+    maxAttempts = DEFAULT_MAX_ATTEMPTS,
+    baseDelayMs = DEFAULT_BASE_DELAY_MS,
+    label = "operation",
+    isRetriable = (resp: Response) => resp.status >= 500,
+  } = options;
+
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const result = await fn();
+
+      // For Response-returning functions, check if we should retry on non-ok status
+      if (result instanceof Response && isRetriable(result)) {
+        throw new Error(`HTTP ${result.status} — retriable`);
+      }
+
+      if (attempt > 1) {
+        console.log(`[retry] ${label}: attempt ${attempt} succeeded`);
+      }
+      return result;
+    } catch (err) {
+      lastError = err;
+      const isLastAttempt = attempt === maxAttempts;
+
+      if (isLastAttempt) {
+        console.error(`[retry] ${label}: all ${maxAttempts} attempts failed`, err);
+        throw err;
+      }
+
+      const delay = baseDelayMs * Math.pow(2, attempt - 1);
+      console.warn(
+        `[retry] ${label}: attempt ${attempt} failed (${String(err)}). `
+          + `Retrying in ${delay}ms (attempt ${attempt + 1}/${maxAttempts})...`
+      );
+      await sleep(delay);
+    }
+  }
+
+  throw lastError;
+}
+
+// ---------------------------------------------------------------------------
 // Fire repository_dispatch to gsd-saas-creator
 // ---------------------------------------------------------------------------
 
@@ -328,19 +396,33 @@ async function dispatchStageChange(
   payload: StageDispatchPayload
 ): Promise<boolean> {
   const url = `https://api.github.com/repos/${owner}/${repo}/dispatches`;
-  const resp = await fetch(url, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-      Accept: "application/vnd.github+json",
-      "User-Agent": "saas-pipeline-webhook/1.0",
-    },
-    body: JSON.stringify({
-      event_type: "stage_changed",
-      client_payload: payload,
-    }),
+
+  // Wrap in a function so we can inspect the response status before deciding to retry
+  const doFetch = async (): Promise<Response> => {
+    const resp = await fetch(url, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+        Accept: "application/vnd.github+json",
+        "User-Agent": "saas-pipeline-webhook/1.0",
+      },
+      body: JSON.stringify({
+        event_type: "stage_changed",
+        client_payload: payload,
+      }),
+    });
+    // Retry on 5xx errors or rate-limit (429)
+    if (!resp.ok && (resp.status >= 500 || resp.status === 429)) {
+      throw new Error(`HTTP ${resp.status}`);
+    }
+    return resp;
+  };
+
+  const resp = await withRetry(doFetch, {
+    label: `dispatch stage_changed → ${payload.repo_name}/${payload.stage}`,
   });
+
   return resp.status === 204;
 }
 
@@ -393,12 +475,15 @@ export default {
     const signature = request.headers.get("x-hub-signature-256") ?? "";
     const event = request.headers.get("x-github-event") ?? "";
 
-    // Verify HMAC signature
-    if (env.GITHUB_WEBHOOK_SECRET) {
-      const valid = await verifySignature(env.GITHUB_WEBHOOK_SECRET, signature, body);
-      if (!valid) {
-        return new Response("Forbidden: invalid signature", { status: 403 });
-      }
+    // Verify HMAC signature — fail hard if the secret is not configured
+    if (!env.GITHUB_WEBHOOK_SECRET) {
+      console.error("GITHUB_WEBHOOK_SECRET is not configured");
+      return new Response("Service unavailable: webhook secret not configured", { status: 503 });
+    }
+
+    const valid = await verifySignature(env.GITHUB_WEBHOOK_SECRET, signature, body);
+    if (!valid) {
+      return new Response("Forbidden: invalid signature", { status: 403 });
     }
 
     let payload: any;
@@ -434,6 +519,13 @@ export default {
     } else if (event === "issue_comment") {
       if (payload.action !== "created") {
         return new Response("Ignored (action)", { status: 200 });
+      }
+
+      // Skip bot comments to prevent the automation from triggering itself
+      const senderType: string = payload?.sender?.type ?? "";
+      const senderLogin: string = payload?.sender?.login ?? "";
+      if (senderType === "Bot" || senderLogin.endsWith("[bot]")) {
+        return new Response("Ignored (bot comment)", { status: 200 });
       }
 
       stage = "revisions";

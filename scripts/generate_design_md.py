@@ -267,16 +267,26 @@ def generate_design_md(
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Generate design.md via Gemini")
-    parser.add_argument("--repo-dir", default="./output", help="Target repo directory")
+    parser.add_argument("--repo-dir", default="./output/default", help="Target repo directory")
     parser.add_argument("--brief", help="Explicit path to brief.md")
     parser.add_argument("--design-language", help="Explicit path to design-language.md")
     parser.add_argument("--design-tokens", help="Explicit path to design-tokens.json")
+    parser.add_argument("--force", action="store_true", help="Regenerate even if design.md exists")
     args = parser.parse_args()
 
     repo_dir = Path(args.repo_dir)
     brief_path = Path(args.brief) if args.brief else repo_dir / "brief.md"
     dl_path = _resolve_design_language(repo_dir, args.design_language)
     tokens_path = _resolve_tokens(repo_dir, dl_path, args.design_tokens)
+
+    out_path = repo_dir / "design.md"
+
+    # Idempotent: skip if already generated (unless --force)
+    if out_path.exists() and not args.force:
+        existing = out_path.read_text().strip()
+        if existing:
+            print(f"  → design.md already exists ({len(existing):,} chars), skipping. Use --force to regenerate.")
+            return
 
     brief_md = _load(brief_path, "brief.md", required=True)
     design_language_md = _load(dl_path, "design-language.md")
@@ -299,7 +309,6 @@ def main() -> None:
         template=template,
     )
 
-    out_path = repo_dir / "design.md"
     out_path.write_text(design_md)
     print(f"\n✓ design.md written to {out_path} ({len(design_md):,} chars)")
 
