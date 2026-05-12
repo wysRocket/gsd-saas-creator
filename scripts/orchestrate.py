@@ -110,6 +110,8 @@ def handle_brief(args, token):
         
     except subprocess.CalledProcessError as e:
         _post_error_and_exit(args.repo_name, args.issue_number, "brief", str(e), token)
+    except Exception as e:
+        _post_error_and_exit(args.repo_name, args.issue_number, "brief", str(e), token)
 
 def handle_design_md(args, token):
     repo_dir = OUTPUT_DIR / args.repo_name
@@ -136,6 +138,8 @@ def handle_design_md(args, token):
         
     except subprocess.CalledProcessError as e:
         _post_error_and_exit(args.repo_name, args.issue_number, "design_md", str(e), token)
+    except Exception as e:
+        _post_error_and_exit(args.repo_name, args.issue_number, "design_md", str(e), token)
 
 def handle_stitch_prompt(args, token):
     repo_dir = OUTPUT_DIR / args.repo_name
@@ -161,6 +165,8 @@ def handle_stitch_prompt(args, token):
         # We do NOT advance stage automatically here
         
     except subprocess.CalledProcessError as e:
+        _post_error_and_exit(args.repo_name, args.issue_number, "stitch_prompt", str(e), token)
+    except Exception as e:
         _post_error_and_exit(args.repo_name, args.issue_number, "stitch_prompt", str(e), token)
 
 def handle_ai_studio(args, token):
@@ -309,7 +315,7 @@ def main():
     parser = argparse.ArgumentParser(description="Orchestrate SaaS project pipeline")
     parser.add_argument("--stage", default="", help="Current project stage")
     parser.add_argument("--item-id", default="", help="GitHub Project item ID")
-    parser.add_argument("--issue-number", default="", help="GitHub Issue number")
+    parser.add_argument("--issue-number", type=int, default=0, help="GitHub Issue number")
     parser.add_argument("--repo-name", default="", help="Repository name")
     parser.add_argument("--project-name", default="", help="Project name")
     parser.add_argument("--competitor-url", default="", help="Competitor URL")

@@ -26,21 +26,26 @@ STAGE_IDS = {
 }
 
 GITHUB_GRAPHQL_URL = "https://api.github.com/graphql"
+REQUEST_TIMEOUT = 30
 
 # ---------------------------------------------------------------------------
 # Functions
 # ---------------------------------------------------------------------------
 
+def _graphql_headers(token):
+    return {
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/vnd.github+json",
+        "User-Agent": "gsd-saas-creator/1.0",
+    }
+
 def post_comment(repo_full_name, issue_number, body, token):
     """POST a comment to a GitHub issue/PR."""
     url = f"https://api.github.com/repos/{repo_full_name}/issues/{issue_number}/comments"
-    headers = {
-        "Authorization": f"token {token}",
-        "Accept": "application/vnd.github.v3+json"
-    }
+    headers = _graphql_headers(token)
     payload = {"body": body}
     try:
-        response = requests.post(url, headers=headers, json=payload)
+        response = requests.post(url, headers=headers, json=payload, timeout=REQUEST_TIMEOUT)
         response.raise_for_status()
         return response.json()
     except Exception as e:
@@ -72,9 +77,9 @@ def update_stage(item_id, stage_key, token):
         "fieldId": STAGE_FIELD_ID,
         "optionId": option_id
     }
-    headers = {"Authorization": f"Bearer {token}"}
+    headers = _graphql_headers(token)
     try:
-        response = requests.post(GITHUB_GRAPHQL_URL, headers=headers, json={"query": mutation, "variables": variables})
+        response = requests.post(GITHUB_GRAPHQL_URL, headers=headers, json={"query": mutation, "variables": variables}, timeout=REQUEST_TIMEOUT)
         response.raise_for_status()
         result = response.json()
         if "errors" in result:
@@ -105,9 +110,9 @@ def update_text_field(item_id, field_id, value, token):
         "fieldId": field_id,
         "value": value
     }
-    headers = {"Authorization": f"Bearer {token}"}
+    headers = _graphql_headers(token)
     try:
-        response = requests.post(GITHUB_GRAPHQL_URL, headers=headers, json={"query": mutation, "variables": variables})
+        response = requests.post(GITHUB_GRAPHQL_URL, headers=headers, json={"query": mutation, "variables": variables}, timeout=REQUEST_TIMEOUT)
         response.raise_for_status()
         result = response.json()
         if "errors" in result:
@@ -141,9 +146,9 @@ def get_item_fields(item_id, token):
     }
     """
     variables = {"itemId": item_id}
-    headers = {"Authorization": f"Bearer {token}"}
+    headers = _graphql_headers(token)
     try:
-        response = requests.post(GITHUB_GRAPHQL_URL, headers=headers, json={"query": query, "variables": variables})
+        response = requests.post(GITHUB_GRAPHQL_URL, headers=headers, json={"query": query, "variables": variables}, timeout=REQUEST_TIMEOUT)
         response.raise_for_status()
         data = response.json()
         if "errors" in data:
