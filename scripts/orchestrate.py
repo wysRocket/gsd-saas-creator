@@ -5,6 +5,8 @@ import sys
 import tempfile
 import shutil
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 import board_ops
 
 # ---------------------------------------------------------------------------
@@ -25,9 +27,12 @@ def _push_artifacts(repo_name, files, commit_msg, token):
     """Clone, copy files, commit, and push to the SaaS-Pretty-Projects repo."""
     clone_dir = Path(tempfile.mkdtemp())
     try:
-        repo_url = f"https://x-access-token:{token}@github.com/{board_ops.ORG}/{repo_name}.git"
         print(f"  → cloning {repo_name} …")
-        subprocess.run(["git", "clone", repo_url, str(clone_dir)], check=True, capture_output=True)
+        subprocess.run(
+            ["gh", "repo", "clone", f"{board_ops.ORG}/{repo_name}", str(clone_dir)],
+            check=True, capture_output=True,
+            env={**os.environ, "GH_TOKEN": token},
+        )
         
         source_dir = OUTPUT_DIR / repo_name
         copied = False
@@ -157,25 +162,103 @@ def handle_stitch_prompt(args, token):
         _post_error_and_exit(args.repo_name, args.issue_number, "stitch_prompt", str(e), token)
 
 def handle_ai_studio(args, token):
-    repo_dir = OUTPUT_DIR / args.repo_name
+    """Scaffold the application: create repo, clone it, run scaffold.py, push, update board."""
+    clone_dir = Path(tempfile.mkdtemp())
     try:
+        # 1. Ensure GitHub repo exists
+        print(f"  → ensuring github repo {args.repo_name} exists …")
+        subprocess.run(
+            ["gh", "repo", "create", f"{board_ops.ORG}/{args.repo_name}", "--public",
+             "--description", f"{args.project_name} SaaS"],
+            check=False,  # idempotent - ok if already exists
+            env={**os.environ, "GH_TOKEN": token},
+        )
+
+        # 2. Clone the repo
+        print(f"  → cloning {args.repo_name} …")
+        subprocess.run(
+            ["gh", "repo", "clone", f"{board_ops.ORG}/{args.repo_name}", str(clone_dir)],
+            check=True,
+            env={**os.environ, "GH_TOKEN": token},
+        )
+
+        # 3. Run scaffold.py into the cloned dir
         print(f"  → scaffolding application for {args.repo_name} …")
-        # best effort scaffold
-        subprocess.run([
-            sys.executable, str(PROJECT_ROOT / "scripts" / "scaffold.py"),
-            "--repo-dir", str(repo_dir)
-        ], check=False)
-        
-        # Push everything in output/{repo_name}
-        files = [p.name for p in repo_dir.iterdir()]
-        _push_artifacts(args.repo_name, files, "feat: scaffold application from designs", token)
-        
+        subprocess.run(
+            [sys.executable, str(PROJECT_ROOT / "scripts" / "scaffold.py"),
+             "--repo-dir", str(clone_dir)],
+            check=False,  # best-effort scaffold
+        )
+
+        # 4. Commit and push
+        print(f"  → committing and pushing scaffold artifacts …")
+        subprocess.run(["git", "-C", str(clone_dir), "add", "."], check=True)
+        commit_result = subprocess.run(
+            ["git", "-C", str(clone_dir), "commit", "-m", "feat: scaffold application from designs"],
+            check=False, capture_output=True, text=True
+        )
+        if commit_result.returncode == 0:
+            subprocess.run(
+                ["git", "-C", str(clone_dir), "push"],
+                check=True,
+                env={**os.environ, "GH_TOKEN": token},
+            )
+            print(f"  ✓ pushed scaffold artifacts to {args.repo_name}")
+        else:
+            # No changes to commit (scaffold may have produced nothing)
+            print(f"  → no changes to commit (scaffold produced no artifacts)")
+
+        # 5. Set Repo URL field on the board
+        repo_url = f"https://github.com/{board_ops.ORG}/{args.repo_name}"
+        board_ops.update_text_field(args.item_id, board_ops.REPO_URL_FIELD_ID, repo_url, token)
+
+        # 6. Advance stage to In Progress
+        board_ops.update_stage(args.item_id, "in_progress", token)
+
         comment = "🚀 **Application Scaffolding Complete**\n\nThe implementation has been pushed to the repo. Moving to **In Progress** for human refinement."
         board_ops.post_comment(f"{board_ops.ORG}/{args.repo_name}", args.issue_number, comment, token)
-        board_ops.update_stage(args.item_id, "in_progress", token)
-        
+
+    except subprocess.CalledProcessError as e:
+        _post_error_and_exit(args.repo_name, args.issue_number, "ai_studio", str(e), token)
     except Exception as e:
         _post_error_and_exit(args.repo_name, args.issue_number, "ai_studio", str(e), token)
+    finally:
+        shutil.rmtree(clone_dir)
+
+def handle_qa(args, token):
+    """Run QA validation on all generated artifacts. Blocks promotion on failure."""
+    repo_dir = OUTPUT_DIR / args.repo_name
+    try:
+        print(f"  → running QA validation for {args.repo_name} …")
+        result = subprocess.run([
+            sys.executable, str(PROJECT_ROOT / "scripts" / "agent_workflow.py"),
+            "validate-stage", "qa",
+            "--repo-dir", str(repo_dir),
+            "--log"
+        ], capture_output=True, text=True)
+
+        if result.returncode != 0:
+            failures = result.stdout + result.stderr
+            board_ops.post_comment(
+                f"{board_ops.ORG}/{args.repo_name}", args.issue_number,
+                f"❌ **QA Validation Failed**\n\nThe artifact set failed QA checks:\n```\n{failures[-1000:]}\n```\n\nPlease review and move to **Revisions** to regenerate.", token
+            )
+            print(f"  [qa] validation failed:\n{failures[-1000:]}")
+            return  # Do NOT advance stage — QA is a gate
+
+        # QA passed — advance to deploy
+        board_ops.post_comment(
+            f"{board_ops.ORG}/{args.repo_name}", args.issue_number,
+            "✅ **QA Passed — All artifacts validated**\n\n`brief.md`, `design.md`, `stitch-prompt.md` are complete and verified.\nAdvancing to **Deploy** stage.", token
+        )
+        board_ops.update_stage(args.item_id, "launched", token)
+        print(f"  ✓ QA passed, advanced to launched")
+
+    except subprocess.CalledProcessError as e:
+        _post_error_and_exit(args.repo_name, args.issue_number, "qa", str(e), token)
+    except Exception as e:
+        _post_error_and_exit(args.repo_name, args.issue_number, "qa", str(e), token)
+
 
 def handle_launched(args, token):
     repo_dir = OUTPUT_DIR / args.repo_name
@@ -185,7 +268,7 @@ def handle_launched(args, token):
             sys.executable, str(PROJECT_ROOT / "scripts" / "deploy.py"),
             "--repo-dir", str(repo_dir)
         ], check=False)
-        
+
         comment = "🌐 **SaaS Application Deployed!**\n\nThe application is now live. Moving to **Operating** stage."
         board_ops.post_comment(f"{board_ops.ORG}/{args.repo_name}", args.issue_number, comment, token)
         board_ops.update_stage(args.item_id, "operating", token)
@@ -242,6 +325,8 @@ def main():
         handle_design_md(args, token)
     elif stage == "stitch_prompt":
         handle_stitch_prompt(args, token)
+    elif stage == "qa":
+        handle_qa(args, token)
     elif stage == "ai_studio":
         handle_ai_studio(args, token)
     elif stage == "launched":

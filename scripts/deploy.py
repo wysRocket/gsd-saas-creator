@@ -55,7 +55,15 @@ def check_cli_tools() -> None:
         sys.exit(1)
 
 
-def deploy(dry_run: bool = False) -> None:
+def deploy(dry_run: bool = False, repo_dir: str | None = None) -> None:
+    if repo_dir:
+        path = Path(repo_dir)
+        if path.exists() and path.is_dir():
+            print(f"  → changing directory to {path}")
+            os.chdir(path)
+        else:
+            print(f"  [warning] repo_dir {path} not found or not a directory")
+
     firebase_token = env("FIREBASE_TOKEN")
     project_id = env("FIREBASE_PROJECT_ID")
     github_repo = env("GITHUB_REPO")
@@ -116,5 +124,6 @@ def deploy(dry_run: bool = False) -> None:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Deploy SaaS to Firebase + GitHub Actions")
     parser.add_argument("--dry-run", action="store_true", help="Print commands without executing them")
+    parser.add_argument("--repo-dir", help="Target repo directory")
     args = parser.parse_args()
-    deploy(dry_run=args.dry_run)
+    deploy(dry_run=args.dry_run, repo_dir=args.repo_dir)
