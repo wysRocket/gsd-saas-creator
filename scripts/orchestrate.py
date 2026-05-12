@@ -13,7 +13,7 @@ import board_ops
 # Config & Helpers
 # ---------------------------------------------------------------------------
 
-GH_TOKEN = os.environ.get("GH_TOKEN", "")
+GH_TOKEN = os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN", "")
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 OUTPUT_DIR = PROJECT_ROOT / "output"
 
@@ -25,8 +25,9 @@ def _require_token():
 
 def _push_artifacts(repo_name, files, commit_msg, token):
     """Clone, copy files, commit, and push to the SaaS-Pretty-Projects repo."""
-    clone_dir = Path(tempfile.mkdtemp())
+    clone_dir = None
     try:
+        clone_dir = Path(tempfile.mkdtemp())
         print(f"  → cloning {repo_name} …")
         subprocess.run(
             ["gh", "repo", "clone", f"{board_ops.ORG}/{repo_name}", str(clone_dir)],
@@ -66,9 +67,10 @@ def _push_artifacts(repo_name, files, commit_msg, token):
         subprocess.run(["git", "-C", str(clone_dir), "push"], check=True)
         print(f"  ✓ pushed artifacts to {repo_name}")
     except subprocess.CalledProcessError as e:
-        print(f"  [error] git operation failed: {e.stderr.decode() if e.stderr else e}")
+        print(f"  [error] git operation failed: {e.stderr.decode() if e.stderr else str(e).replace(token, '***')}")
     finally:
-        shutil.rmtree(clone_dir)
+        if clone_dir and clone_dir.exists():
+            shutil.rmtree(clone_dir)
 
 def _post_error_and_exit(repo_name, issue_number, stage, error_msg, token):
     body = f"❌ **Error in stage '{stage}'**\n\n{error_msg}"
@@ -163,7 +165,7 @@ def handle_stitch_prompt(args, token):
 
 def handle_ai_studio(args, token):
     """Scaffold the application: create repo, clone it, run scaffold.py, push, update board."""
-    clone_dir = Path(tempfile.mkdtemp())
+    clone_dir = None
     try:
         # 1. Ensure GitHub repo exists
         print(f"  → ensuring github repo {args.repo_name} exists …")
@@ -176,6 +178,7 @@ def handle_ai_studio(args, token):
 
         # 2. Clone the repo
         print(f"  → cloning {args.repo_name} …")
+        clone_dir = Path(tempfile.mkdtemp())
         subprocess.run(
             ["gh", "repo", "clone", f"{board_ops.ORG}/{args.repo_name}", str(clone_dir)],
             check=True,
@@ -187,7 +190,7 @@ def handle_ai_studio(args, token):
         subprocess.run(
             [sys.executable, str(PROJECT_ROOT / "scripts" / "scaffold.py"),
              "--repo-dir", str(clone_dir)],
-            check=False,  # best-effort scaffold
+            check=True,
         )
 
         # 4. Commit and push
@@ -223,7 +226,8 @@ def handle_ai_studio(args, token):
     except Exception as e:
         _post_error_and_exit(args.repo_name, args.issue_number, "ai_studio", str(e), token)
     finally:
-        shutil.rmtree(clone_dir)
+        if clone_dir and clone_dir.exists():
+            shutil.rmtree(clone_dir)
 
 def handle_qa(args, token):
     """Run QA validation on all generated artifacts. Blocks promotion on failure."""
@@ -267,7 +271,7 @@ def handle_launched(args, token):
         subprocess.run([
             sys.executable, str(PROJECT_ROOT / "scripts" / "deploy.py"),
             "--repo-dir", str(repo_dir)
-        ], check=False)
+        ], check=True)
 
         comment = "🌐 **SaaS Application Deployed!**\n\nThe application is now live. Moving to **Operating** stage."
         board_ops.post_comment(f"{board_ops.ORG}/{args.repo_name}", args.issue_number, comment, token)
