@@ -28,6 +28,7 @@ export interface Env {
   REPO_NAME: string;
 }
 
+const PROJECT_ID = "PVT_kwDOEHzfoM4BU-0M";
 const STAGE_FIELD_ID = "PVTSSF_lADOEHzfoM4BU-0MzhQD56k";
 const NOTES_FIELD_ID = "PVTF_lADOEHzfoM4BU-0MzhP_kGg";
 const REPO_URL_FIELD_ID = "PVTF_lADOEHzfoM4BU-0MzhQhuOI";
@@ -387,6 +388,7 @@ type StageDispatchPayload = {
   vertical: string;
   notes: string;
   comment_body: string;
+  project_id: string;
 };
 
 async function dispatchStageChange(
@@ -445,6 +447,7 @@ function buildDispatchPayload(
     vertical: item.vertical,
     notes: item.notes,
     comment_body: commentBody,
+    project_id: PROJECT_ID,
   };
 }
 
@@ -561,6 +564,10 @@ export default {
 
     if (!item) {
       return new Response("Ignored (item not found)", { status: 200 });
+    }
+
+    if (event === "issue_comment" && item.stage !== "Revisions") {
+      return new Response("Ignored (not in revisions stage)", { status: 200 });
     }
 
     const dispatchPayload = buildDispatchPayload(
